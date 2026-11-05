@@ -1,0 +1,261 @@
+# System Architecture
+
+## Overview
+
+Nexora is designed as a modular monorepo separating a responsive Next.js frontend from a high-throughput Python FastAPI backend. The system integrates asynchronous background processing via Celery and Redis to handle computationally heavy AI workflows (e.g., resume parsing, opportunity scoring, embedding generation) without blocking client-facing HTTP requests.
+
+---
+
+## High-Level Topology
+
+```mermaid
+flowchart TD
+    User["User Browser"] -->|HTTPS / Next.js Pages| Frontend["Next.js App Router (Port 3000)"]
+    User -->|REST / JSON| Backend["FastAPI Backend (Port 8000)"]
+    Frontend -->|API Calls (Bearer Auth)| Backend
+    Backend -->|SQLAlchemy / Queries| DB[("PostgreSQL (Port 5432)")]
+    Backend -->|Rate Limiting / Caching| Redis[("Redis Broker / Cache (Port 6379)")]
+    Worker["Celery Worker"] -->|Fetch Jobs| Redis
+    Worker -->|Read / Write State| DB
+    Worker -.->|External AI API Calls| AIProviders["AI Services (Gemini / OpenAI)"]
+```
+
+---
+
+## Component Breakdown
+
+### 1. Frontend (`frontend/`)
+- **Framework**: Next.js 14+ with App Router.
+- **Language**: TypeScript with strict typing.
+- **Styling**: Tailwind CSS with shadcn-compatible CSS variable tokens for clean, themeable interfaces.
+- **Icons**: Lucide React.
+- **Authentication Client**:
+  - In-memory `access_token` retention in React Context (`AuthContext`).
+  - Automatic session hydration via `HttpOnly` refresh token cookie on mount.
+  - Transparent token refresh on expiration.
+  - Dedicated pages: Registration (`/register`), Login (`/login`), and Protected User Area (`/dashboard`).
+
+### 2. Backend Foundation (`backend/`)
+- **Framework**: FastAPI (asynchronous ASGI framework).
+- **Settings & Environment**: Centralized Pydantic `BaseSettings` (`app.core.config.Settings`) supporting `development`, `test`, and `production`. Validates production constraints (`DEBUG=False`, cryptographically secure `SECRET_KEY` and `JWT_SECRET_KEY`, non-default database credentials).
+- **Database Engine**: SQLAlchemy 2.0 ORM with connection pooling (`QueuePool` with pre-ping for production/development; `NullPool`/`StaticPool` for test isolation).
+- **Migrations**: Alembic managing relational database schemas, configured to load centralized settings dynamically without hardcoded credentials.
+- **Background Queue**: Celery workers backed by Redis for decoupled long-running execution.
+
+### 3. Authentication & User Management (`backend/app/models/`, `backend/app/core/security.py`)
+- **User Entity (`users`)**:
+  - UUID primary key.
+  - Normalized, unique email address (`email`, indexed).
+  - Bcrypt-hashed password (`hashed_password`, 12 rounds).
+  - Full name, account status (`is_active`), timestamps (`created_at`, `updated_at`, `last_login_at`).
+- **Token Lifecycle & Rotation (`refresh_tokens`)**:
+  - **Short-Lived Access Token**: Signed JWT with 15-minute validity, containing `sub` (user UUID), `exp`, `iat`, `type=access`, and `jti`.
+  - **Rotating Refresh Token**: Signed JWT with 7-day validity. Stored in PostgreSQL strictly as a SHA-256 hash (`token_hash`) for revocation and reuse detection.
+  - **Automatic Rotation**: On every refresh request, the active refresh token is marked revoked and a brand-new token pair is issued. Re-use of a revoked token triggers an audit alert and revokes access.
+- **Password Security Policy**:
+  - Mandatory complexity: minimum 8 characters, at least one uppercase, one lowercase, one digit, and one special character.
+  - Timing-safe password verification via bcrypt.
+  - Generic login failure responses ("Invalid email or password") to eliminate user enumeration vectors.
+- **Rate Limiting**:
+  - Redis sliding window rate limiter (`login_limiter`, `register_limiter`) enforcing max 5 requests per 60 seconds per IP, with a thread-safe in-memory fallback.
+
+### 4. Database Layer & Session Pattern (`backend/app/core/database.py`)
+- **Relational Store**: PostgreSQL 16.
+- **Session Lifecycle**: Request-safe `get_db()` dependency yielding a scoped `SessionLocal` instance. Automatically triggers `db.rollback()` on uncaught exceptions and guarantees session closure in a `finally` block.
+- **Test Isolation**: Tests override `get_db` using `app.dependency_overrides[get_db]` and an isolated in-memory SQLite engine (`sqlite:///:memory:`).
+- **Audit Trails**: Base timestamp mixin (`created_at`, `updated_at`) across all domain models.
+
+### 5. Error Handling & Standard Response Shape (`backend/app/core/errors.py`)
+All API errors return a uniform, predictable JSON shape:
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found",
+    "details": null,
+    "request_id": "893c5c16-24e5-4712-9c3f-7e9b0629dc62"
+  }
+}
+```
+- **Custom Exceptions**: Inherit from `AppError` (`NotFoundError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `ConflictError`).
+- **Validation Errors**: Request validation failures (HTTP 422) are normalized into clean field-path lists without exposing internal traces.
+- **Unhandled Exceptions**: Caught by a global fallback handler, returning HTTP 500 with a generic message. Internal stack traces are logged securely alongside the correlation ID and never leaked to the client.
+
+### 6. Correlation IDs & Structured Logging (`backend/app/core/logging.py`, `middleware.py`)
+- **Request ID Tracking**: Inbound `X-Request-ID` headers are validated; missing or malformed headers are replaced with a newly generated UUID. The correlation ID is stored in a `contextvars.ContextVar` and echoed on the outgoing response.
+- **Structured Output**: Supports both human-readable text (local development) and JSON format (production/Docker).
+- **Secret Redaction**: Automatic recursive redaction of sensitive parameters (`password`, `secret`, `token`, `authorization`, `api_key`, `database_url`).
+
+### 7. Audit Event Foundation (`backend/app/core/audit.py`)
+- **Schema**: Immutable `AuditEvent` model capturing `event_id`, `timestamp` (UTC), `actor_type`, `actor_id`, `action`, `resource_type`, `resource_id`, `request_id`, and sanitized `metadata`.
+- **Authentication Events**: Emits `auth.register`, `auth.login`, `auth.login_failed`, `auth.token_refresh`, `auth.logout`, and `auth.token_revocation_alert`.
+- **Resume Studio Events**: Emits `resume.upload`, `resume.parsed`, `resume.upload_version`, `resume.download`, and `resume.delete`.
+- **Default Sink**: `LoggingAuditSink` routing events to the `nexora.audit` structured log stream with automatic sanitization of sensitive data.
+
+### 8. Resume Studio: Upload, Parsing & Versioning (`backend/app/services/resume_parser.py`, `storage.py`, `models/resume.py`)
+- **Data Models**:
+  - `Resume`: UUID primary key, scoped to `user_id` (foreign key with `ondelete=CASCADE`), `title`, and pointer to `current_version_id`.
+  - `ResumeVersion`: UUID primary key, `resume_id` foreign key, sequential `version_number` with unique constraint `(resume_id, version_number)`, original filename, file type, file size, internal storage path, parsing status (`uploaded`, `processing`, `parsed`, `failed`), `parsed_content` (PostgreSQL JSONB), `raw_text`, and user-safe `error_summary`.
+- **Storage Abstraction (`LocalStorageService`)**:
+  - Secure path isolation: `{base_dir}/{user_id}/{resume_id}/{version_id}_{sanitized_filename}`.
+  - Strict path traversal defenses: checks relative path against base directory via `Path.resolve()` and `Path.relative_to()`.
+  - Never leaks raw filesystem paths or storage hierarchy in API responses.
+- **File Validation**:
+  - Format validation against allowed extensions (`.pdf`, `.docx`).
+  - Magic byte binary signature validation (`%PDF` for PDF, `PK\x03\x04` for DOCX) preventing file spoofing.
+  - Configurable maximum size check (`MAX_UPLOAD_SIZE_BYTES=10MB`).
+- **Deterministic Parsing Engine**:
+  - Zero third-party SaaS or LLM dependencies: pure Python extraction using `pypdf` and `python-docx`.
+  - Heuristic structured section segmentation (Summary, Skills, Work Experience, Education, Projects, Certifications).
+  - Regex-based contact extraction (name heuristics, email, phone, web/portfolio links).
+  - Graceful handling of unparseable or scanned documents: sets `parsing_status=failed` with actionable user guidance without throwing uncaught server errors.
+- **User Scoping & Isolation**:
+  - Every resume and version query is filtered by `user_id == current_user.id`.
+  - Unowned resume requests return HTTP 404 (Not Found) without leaking the existence of other users' resumes.
+
+### 9. AI Resume Intelligence (`backend/app/services/ai/`, `backend/app/models/analysis.py`)
+- **Multi-Provider Abstraction (`AIProvider`)**:
+  - Official, maintained SDKs: Google Gemini (`google-genai`) and OpenAI (`openai`).
+  - Provider selection configured server-side via `AI_PROVIDER` (`gemini`, `openai`, `none`).
+  - Configurable models (`GEMINI_MODEL`, `OPENAI_MODEL`).
+  - Strict server-side secret management: API keys are loaded via environment variables and never leaked to the client, frontend, logs, or audit metadata.
+- **Persistent Analysis Model (`ResumeAnalysis`)**:
+  - Linked to `user_id`, `resume_id`, and `version_id` (all foreign keys with `ondelete="CASCADE"`).
+  - Stores status (`pending`, `processing`, `completed`, `failed`), provider, model, validated structured output (`result` in PostgreSQL JSONB), token usage, estimated cost, and timestamps.
+  - Caching & Deduplication: Returns existing completed analysis for identical resume version and provider/model unless `force_refresh=True` is explicitly passed.
+- **Evidence-Grounded Structured Output**:
+  - Pydantic schema enforcing structured outputs with explicit evidence citations (`EvidenceItem(section, excerpt)`).
+  - Evaluates:
+    - **Candidate Profile**: Stated summary, core technical domains, career level estimate (clearly labeled as an estimate).
+    - **Skills Evidence Audit**: Categorized skills, supported skills (substantiated by work experience), unevidenced skills (listed but lacking context). Unverified disclaimer.
+    - **Experience Evidence**: Explicit measurable outcomes vs. vague claims.
+    - **Resume Strengths & Opportunities**: Actionable feedback with source references.
+    - **Role Suitability**: Heuristics for 7 standardized role families (e.g. AI / ML Engineer, Full Stack, Python Backend Developer) with heuristic disclaimer.
+    - **Prioritized Recommendations**: High/Medium/Low priority cards.
+- **Security & Reliability Safeguards**:
+  - Prompt Injection Defense: Resume text is wrapped inside `<RESUME_DOCUMENT>` tags and treated as untrusted external data. The system prompt instructs the model to ignore any embedded directives.
+  - Token Budget & Truncation: Hard ceiling on input length (`AI_MAX_INPUT_CHARS=25000`) protecting against excessive token costs or buffer exhaustion.
+  - Bounded Retries & Timeout: Bounded retry policy for transient errors (429/timeout/503) without infinite retry loops. Safe HTTP 503 (`AI_CONFIG_ERROR`) if provider credentials are not configured.
+- **Privacy & Audit Logging**:
+  - Emits `resume.analysis_requested`, `resume.analysis_completed`, and `resume.analysis_failed`.
+  - Audit metadata captures execution timing, provider, and token counts, strictly omitting resume text, candidate contact details, and API keys.
+
+### 10. Company Discovery & Provenance (`backend/app/models/company.py`, `services/company_service.py`)
+- **Data Model (`companies`)**:
+  - UUID primary key.
+  - Raw and normalized company names (`name`, `normalized_name`) and extracted lowercase domain (`normalized_domain`) for deduplication.
+  - Category taxonomy: `product_company`, `mnc`, `gcc`, `big_four`, `large_it_services`, `established_startup`, `other`.
+  - Geographic footprint: Headquarters country & city, `operating_regions` (PostgreSQL JSONB).
+  - Tags: `industry_tags`, `technology_tags` (PostgreSQL JSONB).
+  - Careers portal URL (`careers_url`), official website, size band, and description.
+  - Verification state machine: `verified`, `corroborated`, `unverified`, `suspicious`. Transitions to verified or corroborated mandate concrete `verification_notes` and update `last_verified_at`.
+  - Scoping & Authorization: `created_by_user_id` (foreign key to `users.id`, ondelete="SET NULL") and `is_global` flag. Global records are read-only to regular users and modifiable only by admins.
+  - Consolidation flag: `is_merged` and `merged_into_company_id` for auditable deduplication history.
+- **Multi-Source Provenance (`company_sources`)**:
+  - Captures granular discovery citations (`official_website`, `careers_page`, `public_directory`, `user_added`, `curated_dataset`, `other`).
+  - Records `source_name`, `source_url`, `evidence_summary`, `first_seen_at`, and `last_checked_at`.
+- **Deduplication & Explicit Merge Architecture**:
+  - Duplicate detection matches on identical normalized domain (high confidence) or normalized legal-stripped name (medium confidence).
+  - Explicit merge operation (`POST /api/v1/companies/{id}/merge`):
+    - Transfers all provenance sources from secondary to target record with provenance attribution.
+    - Fills missing target fields and merges tags without duplicates.
+    - Marks secondary company as merged (`is_merged=True`) and archives it from active search.
+    - Emits auditable `company.merged` event.
+- **SSRF URL Guard (`backend/app/core/url_validator.py`)**:
+  - Strictly limits URL schemes to `http` and `https`.
+  - Blocks loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local/cloud metadata (`169.254.169.254`, `fe80::/10`), and internal hostnames.
+  - Performs DNS resolution checks to prevent DNS rebinding attacks.
+
+### 11. Job Discovery & Ingestion Architecture (`backend/app/models/job.py`, `services/job_service.py`)
+- **Job Entity (`jobs`)**:
+  - UUID primary key.
+  - Optional `company_id` foreign key (`companies.id`, `ondelete="SET NULL"`). Unassociated jobs remain `company_id = None` without assuming or forcing false company ties.
+  - Raw and normalized titles (`title`, `normalized_title` stripping punctuation and normalizing Roman numerals).
+  - Verbatim job description text (`description`).
+  - Strict explicit salary values (`salary_min`, `salary_max`, `salary_currency`, `salary_period`) — strictly unpopulated unless explicitly stated in the source.
+  - Role family taxonomy (`backend_engineer`, `frontend_engineer`, `full_stack_engineer`, `ai_ml_engineer`, etc.), seniority level (`entry_level`, `mid_level`, `senior`, `internship`), and work arrangement (`onsite`, `hybrid`, `remote`, `unspecified`).
+  - Geographic fields: `location_text`, `city`, `state_province`, `country`, and `remote_eligibility_regions` (PostgreSQL JSONB).
+  - Source tracking & canonical deduplication: `job_url`, `application_url`, `external_source_id`, and `canonical_url_hash` (SHA-256 of tracking-stripped URL).
+  - Verification & Status Lifecycle: `job_status` (`active`, `expired`, `closed`, `suspicious`), `verification_status` (`verified`, `corroborated`, `unverified`, `expired`, `suspicious`), `verification_notes` (mandatory for verified status), and timestamps (`first_seen_at`, `last_seen_at`, `last_checked_at`, `last_verified_at`).
+  - Scoping: `created_by_user_id` and `is_global` flag.
+- **Job Source Provenance (`job_sources`)**:
+  - Granular provenance records (`careers_page`, `official_api`, `permitted_feed`, `user_added`, `curated_record`, `other`).
+  - Captures `source_name`, `source_url`, `external_id`, `evidence_summary`, `first_seen_at`, and `last_seen_at`.
+- **Company Association Algorithm**:
+  - Direct association if valid `company_id` provided.
+  - Automated association matches exact normalized domain in `job_url` against active company records.
+  - Secondary fallback matches unambiguous normalized company name hint.
+  - When ambiguous or unresolvable, the record is safely retained as an unassociated job.
+- **Idempotent Ingestion Pipeline**:
+  - Ingestion endpoint (`POST /api/v1/jobs/ingest/feed`) accepts structured batches.
+  - Idempotent duplicate resolution: matching `canonical_url_hash` updates `last_seen_at` and `last_checked_at` and records source citations without generating duplicate job listings.
+  - Safe error recovery: captures per-item errors without failing the batch.
+- **Audit Logging**:
+  - Emits `job.created`, `job.updated`, `job.verified`, `job.source_added`, `job.source_deleted`, and `job.feed_ingested`.
+
+### 12. Job Verification & Freshness Architecture (`backend/app/models/job.py`, `services/job_service.py`, `core/url_validator.py`)
+- **Immutable Verification History (`job_verifications`)**:
+  - Dedicated table recording every verification check and evidence review over time.
+  - Fields: `id`, `job_id`, `verifier_type` (`system`, `user`), `verifier_user_id` (nullable FK to `users.id`), `evidence_type` (`careers_page`, `permitted_api`, `announcement`, `user_evidence`, `other`), `evidence_url`, `evidence_summary`, `observed_status` (`active`, `closed`, `removed`, `expired`, `unknown`), `verification_outcome` (`verified`, `corroborated`, `unverified`, `expired`, `suspicious`), `reason` (mandatory rationale), `checked_at`.
+  - Cascades on delete with parent job, preserves immutable history across sequential checks.
+- **Freshness Tier Calculation**:
+  - Deterministic evaluation based on elapsed days since `last_checked_at`:
+    - `recent`: $\le 7$ days (configurable via `JOB_FRESHNESS_RECENT_DAYS`)
+    - `due_for_review`: $7$ to $14$ days (configurable via `JOB_FRESHNESS_DUE_DAYS`)
+    - `stale`: $> 14$ days
+    - `unknown`: No check timestamp recorded
+  - Reflected on all job representations (`JobResponse.freshness`, `JobDetailResponse.freshness`) and filterable via `GET /api/v1/jobs?freshness=...`.
+- **Connection-Time SSRF-Safe Rechecking (`backend/app/core/url_validator.py`)**:
+  - `safe_check_url_status`: performs safe HTTP availability check.
+  - Multi-hop redirect protection: re-validates hostname and IP against private/loopback/cloud-metadata CIDRs at every hop.
+  - Recheck outcomes:
+    - HTTP 200..399: updates `last_checked_at`, records `system` verification with `observed_status="active"`.
+    - HTTP 404/410: updates `last_checked_at`, automatically marks `job_status="closed"` and logs `expired`/`removed` verification record.
+    - SSRF violation: blocks connection, marks `verification_status="suspicious"`, logs security audit alert.
+    - Connection timeout or ambiguous status: records `manual_evidence_required` check requesting user verification.
+- **Manual Evidence Submission (`POST /api/v1/jobs/{job_id}/verifications`)**:
+  - Allows verified users or administrators to submit verifiable proof URLs, observed status, and mandatory rationale.
+  - Persists new immutable `JobVerification` entity and updates denormalized job verification status.
+- **Audit Logging**:
+  - Emits `job.verified`, `job.evidence_submitted`, `job.rechecked`, `job.recheck_blocked`, and `job.recheck_inconclusive`.
+
+### 13. Job Matching & Ranking Engine Architecture (`backend/app/models/match.py`, `services/matching_engine.py`, `services/matching_service.py`)
+- **Deterministic, Explainable Scoring Algorithm**:
+  - Fast, grounded, and reproducible matching algorithm (`MatchingEngine`, version `v1.0-deterministic`) that evaluates candidate resumes against discovered opportunities without black-box or non-deterministic LLM calls.
+  - **Baseline Dimension Weights**:
+    - Technical Skills Alignment: 35% ($w = 0.35$)
+    - Role Family & Title Fit: 25% ($w = 0.25$)
+    - Seniority & Experience Level: 15% ($w = 0.15$)
+    - Geographic & Work Arrangement: 15% ($w = 0.15$)
+    - Compensation & Salary: 10% ($w = 0.10$)
+- **Undisclosed Salary Integrity & Weight Reallocation**:
+  - When a job listing does not disclose salary or the user specifies no minimum salary preference, `salary_score` is set to `None` with `salary_status="undisclosed"`.
+  - The 10% compensation weight is dynamically reallocated across the remaining 4 dimensions ($w_{skills} = 0.3889$, $w_{role} = 0.2778$, $w_{exp} = 0.1667$, $w_{loc} = 0.1667$), guaranteeing that an undisclosed salary never depresses or penalizes candidate match scores.
+- **Separate Trust Adjustments**:
+  - Listing freshness and verification provenance are separated into a distinct score modifier (`trust_adjustment`), ensuring candidate qualification scores are never conflated with listing metadata:
+    - Freshness: `recent` (+2), `stale` (-3)
+    - Verification: `verified` (+3), `corroborated` (+2), `suspicious` (-30), `closed`/`expired` (-25)
+- **Grounded Evidence & Gap Classification**:
+  - Positive signals cite specific resume sections (`Projects`, `Experience`, `Skills`) and verbatim text excerpts (`SignalEvidenceRef`).
+  - Gaps are explicitly partitioned into `type="missing"` (employer omitted structured requirements; treated neutrally) vs `type="mismatch"` (direct conflict with candidate seniority or preferences).
+- **Negative Exclusions & Deductions**:
+  - Deducts penalty points and adds gap signals for user-excluded role titles (-25), excluded keywords (-20), or excluded company industries (-20).
+- **Persistence & Idempotency**:
+  - `user_matching_preferences`: Persists target roles, locations, work arrangements, min salary, priority skills, and negative exclusions.
+  - `job_matches`: Persists match score, score breakdown JSON, positive signals JSON, gap signals JSON, `is_saved`, `is_dismissed`, and engine version.
+  - Idempotent upsert via unique constraint `uq_user_job_version_engine (user_id, job_id, version_id, engine_version)`.
+- **Multi-Tenant Scoping & Security**:
+  - Every match execution, preference query, and match mutation is strictly scoped to `current_user.id`.
+- **Audit Logging**:
+  - Emits `match.generated`, `match.preferences_updated`, `match.saved`, and `match.dismissed`.
+
+---
+
+## Token & Cookie Security Strategy
+
+| Aspect | Strategy & Implementation | Tradeoff / Mitigation |
+|---|---|---|
+| **Access Token Storage** | Kept strictly in client **memory** (React Context state). | Access token disappears on page reload. Mitigated by instant background refresh via HttpOnly cookie. |
+| **Refresh Token Storage** | Transmitted as an `HttpOnly`, `SameSite=Lax`, `Secure` (in production) cookie scoped to `/api/v1/auth`. Also provided in JSON body for non-browser clients. | Immune to browser JavaScript XSS extraction. Cross-Site Request Forgery is mitigated by `SameSite=Lax` and explicit endpoint paths. |
+| **Database Token Security** | Stored strictly as SHA-256 hashes (`token_hash`), never raw token strings. | In the event of a database snapshot leak, refresh tokens cannot be used to forge user sessions. |
+| **Rotation Protection** | Single-use refresh tokens: each refresh revokes the old token. | Revocation tracking detects replay attacks and invalidates compromised token chains. |
