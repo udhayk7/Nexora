@@ -327,3 +327,4 @@ def delete_interview(
         interview_id=interview_id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+

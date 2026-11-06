@@ -5,6 +5,7 @@ from app.api.v1.auth import auth_router
 from app.api.v1.companies import companies_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.matches import matches_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.resumes import resumes_router
 from app.api.v1.tailoring import tailoring_router
 from app.api.v1.users import users_router
@@ -33,3 +34,4 @@ api_router.include_router(jobs_router)
 api_router.include_router(matches_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(applications_router)
+api_router.include_router(notifications_router)

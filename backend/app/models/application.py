@@ -351,3 +351,4 @@ class ApplicationInterview(Base, TimestampMixin):
         "JobApplication",
         back_populates="interviews",
     )
+

@@ -17,6 +17,15 @@ from app.schemas.application import (
     JobApplicationUpdate,
 )
 from app.schemas.health import HealthResponse
+from app.schemas.notification import (
+    MarkReadAllResponse,
+    NotificationListResponse,
+    NotificationResponse,
+    ProcessRemindersResponse,
+    UnreadCountResponse,
+    UserNotificationPreferenceResponse,
+    UserNotificationPreferenceUpdate,
+)
 from app.schemas.tailoring import (
     BatchChangeActionRequest,
     ChangeStatusUpdateRequest,
@@ -62,5 +71,12 @@ __all__ = [
     "ApplicationInterviewUpdate",
     "ApplicationInterviewResponse",
     "ApplicationAnalyticsResponse",
+    "NotificationResponse",
+    "NotificationListResponse",
+    "UnreadCountResponse",
+    "MarkReadAllResponse",
+    "UserNotificationPreferenceResponse",
+    "UserNotificationPreferenceUpdate",
+    "ProcessRemindersResponse",
 ]
 

@@ -305,6 +305,31 @@ All API errors return a uniform, predictable JSON shape:
 - **Audit Logging**:
   - Emits `application.created`, `application.status_changed`, `application.updated`, `application.link_opened`, `application.deleted`, `application.activity_created`, `application.activity_deleted`, `application.interview_scheduled`, `application.interview_updated`, and `application.interview_deleted`.
 
+### 16. Notification & Reminder System Architecture (`backend/app/models/notification.py`, `services/notification_service.py`, `tasks/reminder_tasks.py`, `frontend/src/app/dashboard/notifications/`)
+- **Centralized Persistent Notifications (`notifications`)**:
+  - Scoped strictly to `user_id` with foreign key cascade on delete.
+  - Fields: `notification_type` (`application_follow_up`, `interview_reminder`, `assessment_reminder`, `application_deadline`, `job_freshness_update`, `task_completion`, `system`), `title`, `message`, `entity_type`, `entity_id`, `action_url`, `is_read`, `read_at`, `scheduled_for`, `delivery_status`, `idempotency_key`, `metadata_json`.
+  - Database Indexes & Constraints:
+    - Unique constraint `uq_notifications_user_idempotency (user_id, idempotency_key)` guarantees duplicate prevention even under concurrent worker retries.
+    - Composite indexes on `(user_id, is_read)` and `(user_id, created_at desc)`.
+- **User Notification Preferences (`user_notification_preferences`)**:
+  - 1-to-1 relationship with `User`.
+  - Configurable category toggles: `enable_in_app`, `enable_interview_reminders`, `enable_assessment_reminders`, `enable_follow_up_reminders`, `enable_deadline_reminders`, `enable_job_freshness_updates`, `enable_task_completion_updates`, `enable_system_notifications`.
+  - Scheduling interval controls: `interview_reminder_24h` and `interview_reminder_1h`.
+  - Timezone personalization: `preferred_timezone` (validated against standard IANA `zoneinfo`).
+  - Disabling categories prevents future notifications without erasing notification history.
+- **Automated Celery & Redis Reminder Processing**:
+  - Celery task `process_scheduled_reminders_task` registered in worker and beat schedule.
+  - Automatically scans upcoming interview rounds, assessment tasks, deadlines, and follow-ups within 24h and 1h intervals.
+  - Timezone-aware message rendering: formats localized event times using the candidate's configured IANA timezone (e.g. `ZoneInfo("America/New_York")`).
+  - Exclusion guards: Skips completed or cancelled interviews and rejected or withdrawn applications.
+  - Strict idempotency key convention: `reminder:{type}:{interval}:{entity_id}` guarantees zero duplicates across task retries.
+- **Frontend Notification Center & Global Bell**:
+  - Global `NotificationBell` in dashboard navigation with real-time unread badge, popover dropdown for fast reads and action URL navigation.
+  - Dedicated `/dashboard/notifications` workspace with category tab filtering (All, Unread, Interviews, Deadlines, Preferences), mark-all-read action, deletion, and interactive preference manager.
+- **Audit Logging**:
+  - Emits `notification.created`, `notification.read`, `notification.read_all`, `notification.deleted`, and `notification.preferences_updated`.
+
 ---
 
 ## Token & Cookie Security Strategy

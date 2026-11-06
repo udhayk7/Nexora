@@ -1261,3 +1261,136 @@ export const applicationsApi = {
     ),
 };
 
+// Notification & Reminder Interfaces
+export type NotificationType =
+  | "application_follow_up"
+  | "interview_reminder"
+  | "assessment_reminder"
+  | "application_deadline"
+  | "job_freshness_update"
+  | "task_completion"
+  | "system";
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  notification_type: NotificationType;
+  title: string;
+  message: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  action_url?: string | null;
+  is_read: boolean;
+  read_at?: string | null;
+  scheduled_for?: string | null;
+  delivery_status: string;
+  idempotency_key?: string | null;
+  metadata_json?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  total: number;
+  unread_count: number;
+  skip: number;
+  limit: number;
+}
+
+export interface UnreadCountResponse {
+  unread_count: number;
+}
+
+export interface MarkReadAllResponse {
+  updated_count: number;
+}
+
+export interface UserNotificationPreference {
+  id: string;
+  user_id: string;
+  enable_in_app: boolean;
+  enable_interview_reminders: boolean;
+  enable_assessment_reminders: boolean;
+  enable_follow_up_reminders: boolean;
+  enable_deadline_reminders: boolean;
+  enable_job_freshness_updates: boolean;
+  enable_task_completion_updates: boolean;
+  enable_system_notifications: boolean;
+  interview_reminder_24h: boolean;
+  interview_reminder_1h: boolean;
+  preferred_timezone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserNotificationPreferenceUpdate {
+  enable_in_app?: boolean;
+  enable_interview_reminders?: boolean;
+  enable_assessment_reminders?: boolean;
+  enable_follow_up_reminders?: boolean;
+  enable_deadline_reminders?: boolean;
+  enable_job_freshness_updates?: boolean;
+  enable_task_completion_updates?: boolean;
+  enable_system_notifications?: boolean;
+  interview_reminder_24h?: boolean;
+  interview_reminder_1h?: boolean;
+  preferred_timezone?: string;
+}
+
+export interface ProcessRemindersResponse {
+  reminders_created: number;
+  scanned_interviews: number;
+  scanned_applications: number;
+}
+
+export const notificationsApi = {
+  list: (params?: {
+    unread_only?: boolean;
+    notification_type?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.unread_only) q.append("unread_only", "true");
+    if (params?.notification_type && params.notification_type !== "all") {
+      q.append("notification_type", params.notification_type);
+    }
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<NotificationListResponse>(`/notifications${qs ? `?${qs}` : ""}`);
+  },
+
+  getUnreadCount: () => apiClient<UnreadCountResponse>("/notifications/unread-count"),
+
+  markRead: (id: string) =>
+    apiClient<NotificationItem>(`/notifications/${id}/read`, {
+      method: "PATCH",
+    }),
+
+  markAllRead: () =>
+    apiClient<MarkReadAllResponse>("/notifications/read-all", {
+      method: "POST",
+    }),
+
+  delete: (id: string) =>
+    apiClient<{ message: string }>(`/notifications/${id}`, {
+      method: "DELETE",
+    }),
+
+  getPreferences: () =>
+    apiClient<UserNotificationPreference>("/notifications/preferences"),
+
+  updatePreferences: (data: UserNotificationPreferenceUpdate) =>
+    apiClient<UserNotificationPreference>("/notifications/preferences", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  processReminders: () =>
+    apiClient<ProcessRemindersResponse>("/notifications/process-reminders", {
+      method: "POST",
+    }),
+};
+

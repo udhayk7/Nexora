@@ -3,8 +3,9 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Briefcase, Building2, CheckSquare, FileText, Layers, LogOut, ShieldCheck, Sparkles, User } from "lucide-react";
+import { ArrowRight, Bell, Briefcase, Building2, CheckSquare, FileText, Layers, LogOut, ShieldCheck, Sparkles, User } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -43,12 +44,15 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-secondary transition-colors"
-        >
-          <LogOut className="w-4 h-4 text-muted-foreground" /> Log Out
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-md border border-border bg-background hover:bg-secondary transition-colors"
+          >
+            <LogOut className="w-4 h-4 text-muted-foreground" /> Log Out
+          </button>
+        </div>
       </header>
 
       <section className="p-6 rounded-lg border border-border bg-card">
@@ -219,6 +223,26 @@ export default function DashboardPage() {
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               Factual AI alignment, change-by-change acceptance, PDF compilation, and tailored resume export.
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/notifications"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                <Bell className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open Alerts <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              Notifications & Reminders
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Scheduled interview alarms, deadline alerts, follow-up notifications, and timezone preferences.
             </p>
           </Link>
         </div>

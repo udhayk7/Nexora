@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
+    from app.models.notification import Notification, UserNotificationPreference
     from app.models.resume import Resume
     from app.models.tailoring import ResumeTailoringSession
     from app.models.token import RefreshToken
@@ -101,6 +102,17 @@ class User(Base, TimestampMixin):
     applications: Mapped[list["JobApplication"]] = relationship(
         "JobApplication",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    notifications: Mapped[list["Notification"]] = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    notification_preferences: Mapped[Optional["UserNotificationPreference"]] = relationship(
+        "UserNotificationPreference",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
     )
 

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/auth-context";
+import { NotificationBell } from "@/components/NotificationBell";
 import {
   ApplicationActivity,
   ApplicationAnalytics,
@@ -549,6 +550,7 @@ function ApplicationsContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               onClick={() => {
                 setIsRefreshing(true);
