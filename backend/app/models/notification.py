@@ -179,3 +179,4 @@ class UserNotificationPreference(Base, TimestampMixin):
         "User",
         back_populates="notification_preferences",
     )
+

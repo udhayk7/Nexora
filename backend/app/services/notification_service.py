@@ -416,16 +416,19 @@ class NotificationService:
 
         for iv in interviews:
             scheduled_utc = _ensure_utc(iv.scheduled_at)
-            if not scheduled_utc or scheduled_utc < now:
-                # Event already started or in past
+            if not scheduled_utc or scheduled_utc <= now:
+                # Event already started or in past; do not send reminders
                 continue
+
+            delta = scheduled_utc - now
 
             pref = get_pref(iv.user_id)
             if not pref.enable_in_app:
                 continue
 
             is_assessment = (
-                "assessment" in iv.interview_type or iv.interview_type == "coding_assessment"
+                "assessment" in iv.interview_type
+                or iv.interview_type in ("coding_assessment", "take_home", "online_assessment")
             )
             notif_type = "assessment_reminder" if is_assessment else "interview_reminder"
             category_enabled = (
@@ -446,8 +449,10 @@ class NotificationService:
             time_display = local_dt.strftime("%b %d, %Y at %I:%M %p")
             type_label = "Assessment" if is_assessment else "Interview"
 
-            # Window 1: 24-hour reminder (scheduled between now and now + 24 hours)
-            within_24h = now <= scheduled_utc <= now + timedelta(hours=24, minutes=15)
+            # Window 1: 24-hour reminder (~24 hours prior)
+            # Nominal window [23h45m, 24h15m] with 2-hour missed recovery grace period [22h, 24h15m]
+            # An event 30 minutes away (< 22h) will NEVER trigger this 24-hour reminder
+            within_24h = timedelta(hours=22) <= delta <= timedelta(hours=24, minutes=15)
             if pref.interview_reminder_24h and within_24h:
                 idemp_24h = f"reminder:{notif_type}:24h:{iv.id}"
                 _, was_created = cls.create_notification_record(
@@ -456,7 +461,7 @@ class NotificationService:
                     notification_type=notif_type,
                     title=f"Upcoming {type_label}: Round {iv.round_number}",
                     message=(
-                        f"Your {iv.title} is scheduled for tomorrow at {time_display} "
+                        f"Your {iv.title} is scheduled for {time_display} "
                         f"({pref.preferred_timezone})."
                     ),
                     entity_type="interview",
@@ -473,8 +478,10 @@ class NotificationService:
                 if was_created:
                     created_count += 1
 
-            # Window 2: 1-hour reminder (scheduled between now and now + 1 hour)
-            within_1h = now <= scheduled_utc <= now + timedelta(hours=1, minutes=15)
+            # Window 2: 1-hour reminder (~1 hour prior)
+            # Nominal window [45m, 75m] with grace period down to event start (0 < delta <= 75m)
+            # Will not send if event has already started
+            within_1h = timedelta(0) < delta <= timedelta(hours=1, minutes=15)
             if pref.interview_reminder_1h and within_1h:
                 idemp_1h = f"reminder:{notif_type}:1h:{iv.id}"
                 _, was_created_1h = cls.create_notification_record(

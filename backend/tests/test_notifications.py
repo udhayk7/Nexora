@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationInterview, JobApplication
+from app.models.notification import Notification
 from app.models.user import User
 from app.services.notification_service import NotificationService
 from app.tasks.reminder_tasks import process_scheduled_reminders_task
@@ -232,14 +234,14 @@ def test_reminder_scheduling_and_intervals(client: TestClient, db_session: Sessi
     db_session.add(app)
     db_session.commit()
 
-    # Create an interview scheduled in 2 hours (within 24h window)
+    # Create an interview scheduled in 24 hours (within 24h window [22h, 24h15m])
     iv = ApplicationInterview(
         application_id=app.id,
         user_id=user.id,
         round_number=2,
         interview_type="technical",
         title="Systems & Coding Round",
-        scheduled_at=now + timedelta(hours=2),
+        scheduled_at=now + timedelta(hours=24),
         duration_minutes=60,
         status="scheduled",
     )
@@ -287,7 +289,7 @@ def test_duplicate_prevention_idempotency(client: TestClient, db_session: Sessio
         round_number=1,
         interview_type="technical",
         title="Initial Screen",
-        scheduled_at=now + timedelta(hours=10),
+        scheduled_at=now + timedelta(hours=24),
         status="scheduled",
     )
     db_session.add(iv)
@@ -396,3 +398,309 @@ def test_celery_task_execution() -> None:
     data = result.result
     assert data["status"] == "success"
     assert "reminders_created" in data
+
+
+def test_event_30_minutes_away_does_not_trigger_24h_reminder(
+    client: TestClient, db_session: Session
+) -> None:
+    """An event 30 minutes away must trigger 1h reminder but NEVER 24h reminder."""
+    headers, email = create_user_and_token(client, "thirty_min@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    now = datetime.now(timezone.utc)
+    app = JobApplication(
+        user_id=user.id,
+        title="Backend Engineer",
+        company_name="Cloudflare",
+        status="interview",
+        application_channel="official_portal",
+    )
+    db_session.add(app)
+    db_session.commit()
+
+    # Interview 30 minutes away
+    iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=1,
+        interview_type="technical",
+        title="Technical Screen",
+        scheduled_at=now + timedelta(minutes=30),
+        status="scheduled",
+    )
+    # Assessment 30 minutes away
+    assessment = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=2,
+        interview_type="take_home",
+        title="Coding Assessment",
+        scheduled_at=now + timedelta(minutes=30),
+        status="scheduled",
+    )
+    db_session.add_all([iv, assessment])
+    db_session.commit()
+
+    # Process reminders
+    proc_res = client.post("/api/v1/notifications/process-reminders", headers=headers)
+    assert proc_res.status_code == 200
+
+    notifs = db_session.query(Notification).filter(Notification.user_id == user.id).all()
+    # Exactly two 1h reminders created (one for interview, one for assessment)
+    assert len(notifs) == 2
+
+    idempotency_keys = [n.idempotency_key for n in notifs]
+    # Verify 1h keys are present
+    assert f"reminder:interview_reminder:1h:{iv.id}" in idempotency_keys
+    assert f"reminder:assessment_reminder:1h:{assessment.id}" in idempotency_keys
+
+    # Crucial assertion: 24h reminder keys must NEVER be generated for 30m events
+    assert f"reminder:interview_reminder:24h:{iv.id}" not in idempotency_keys
+    assert f"reminder:assessment_reminder:24h:{assessment.id}" not in idempotency_keys
+
+    for n in notifs:
+        assert n.metadata_json.get("interval") == "1h"
+
+
+def test_event_24_hours_away_triggers_only_24h_reminder(
+    client: TestClient, db_session: Session
+) -> None:
+    """An event ~24 hours away triggers only the 24-hour reminder, not the 1-hour."""
+    headers, email = create_user_and_token(client, "twenty_four_hr@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    now = datetime.now(timezone.utc)
+    app = JobApplication(
+        user_id=user.id,
+        title="Systems Engineer",
+        company_name="Datadog",
+        status="interview",
+        application_channel="official_portal",
+    )
+    db_session.add(app)
+    db_session.commit()
+
+    # Interview exactly 24 hours away
+    iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=1,
+        interview_type="technical",
+        title="Architecture Discussion",
+        scheduled_at=now + timedelta(hours=24),
+        status="scheduled",
+    )
+    db_session.add(iv)
+    db_session.commit()
+
+    proc_res = client.post("/api/v1/notifications/process-reminders", headers=headers)
+    assert proc_res.status_code == 200
+
+    notifs = db_session.query(Notification).filter(Notification.user_id == user.id).all()
+    assert len(notifs) == 1
+
+    notif = notifs[0]
+    assert notif.idempotency_key == f"reminder:interview_reminder:24h:{iv.id}"
+    assert notif.metadata_json.get("interval") == "24h"
+    assert "Upcoming Interview" in notif.title
+
+
+def test_event_1_hour_away_triggers_only_1h_reminder(
+    client: TestClient, db_session: Session
+) -> None:
+    """An event ~1 hour away triggers only the 1-hour reminder."""
+    headers, email = create_user_and_token(client, "one_hr@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    now = datetime.now(timezone.utc)
+    app = JobApplication(
+        user_id=user.id,
+        title="Platform Engineer",
+        company_name="Figma",
+        status="interview",
+        application_channel="official_portal",
+    )
+    db_session.add(app)
+    db_session.commit()
+
+    # Interview 55 minutes away
+    iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=1,
+        interview_type="technical",
+        title="Pair Programming",
+        scheduled_at=now + timedelta(minutes=55),
+        status="scheduled",
+    )
+    db_session.add(iv)
+    db_session.commit()
+
+    proc_res = client.post("/api/v1/notifications/process-reminders", headers=headers)
+    assert proc_res.status_code == 200
+
+    notifs = db_session.query(Notification).filter(Notification.user_id == user.id).all()
+    assert len(notifs) == 1
+
+    notif = notifs[0]
+    assert notif.idempotency_key == f"reminder:interview_reminder:1h:{iv.id}"
+    assert notif.metadata_json.get("interval") == "1h"
+    assert "less than an hour" in notif.message
+
+
+def test_missed_execution_recovery(client: TestClient, db_session: Session) -> None:
+    """Ensure missed executions within the grace period are recovered properly."""
+    headers, email = create_user_and_token(client, "recovery_test@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    now = datetime.now(timezone.utc)
+    app = JobApplication(
+        user_id=user.id,
+        title="Infrastructure Lead",
+        company_name="Vercel",
+        status="interview",
+        application_channel="official_portal",
+    )
+    db_session.add(app)
+    db_session.commit()
+
+    # Worker was offline when the 24h mark hit; now it's 22.5 hours away (within 2h grace window)
+    iv_24h_missed = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=1,
+        interview_type="technical",
+        title="Tech Screen",
+        scheduled_at=now + timedelta(hours=22, minutes=30),
+        status="scheduled",
+    )
+    # Worker was offline when 1h mark hit; now it's 20 minutes away (within 1h grace window)
+    iv_1h_missed = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=2,
+        interview_type="behavioral",
+        title="Manager Chat",
+        scheduled_at=now + timedelta(minutes=20),
+        status="scheduled",
+    )
+    db_session.add_all([iv_24h_missed, iv_1h_missed])
+    db_session.commit()
+
+    proc_res = client.post("/api/v1/notifications/process-reminders", headers=headers)
+    assert proc_res.status_code == 200
+
+    notifs = db_session.query(Notification).filter(Notification.user_id == user.id).all()
+    assert len(notifs) == 2
+
+    idemp_keys = [n.idempotency_key for n in notifs]
+    assert f"reminder:interview_reminder:24h:{iv_24h_missed.id}" in idemp_keys
+    assert f"reminder:interview_reminder:1h:{iv_1h_missed.id}" in idemp_keys
+
+
+def test_events_started_or_completed_do_not_receive_reminders(
+    client: TestClient, db_session: Session
+) -> None:
+    """Events in the past (delta <= 0) or completed/cancelled must not receive reminders."""
+    headers, email = create_user_and_token(client, "past_events@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    now = datetime.now(timezone.utc)
+    app = JobApplication(
+        user_id=user.id,
+        title="Data Engineer",
+        company_name="Snowflake",
+        status="interview",
+        application_channel="official_portal",
+    )
+    db_session.add(app)
+    db_session.commit()
+
+    # Event started 5 minutes ago
+    past_iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=1,
+        interview_type="technical",
+        title="Past Interview",
+        scheduled_at=now - timedelta(minutes=5),
+        status="scheduled",
+    )
+    # Event cancelled
+    cancelled_iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=2,
+        interview_type="technical",
+        title="Cancelled Interview",
+        scheduled_at=now + timedelta(hours=24),
+        status="cancelled",
+    )
+    # Event completed
+    completed_iv = ApplicationInterview(
+        application_id=app.id,
+        user_id=user.id,
+        round_number=3,
+        interview_type="technical",
+        title="Completed Interview",
+        scheduled_at=now + timedelta(minutes=45),
+        status="completed",
+        outcome="passed",
+    )
+    db_session.add_all([past_iv, cancelled_iv, completed_iv])
+    db_session.commit()
+
+    proc_res = client.post("/api/v1/notifications/process-reminders", headers=headers)
+    assert proc_res.status_code == 200
+    assert proc_res.json()["reminders_created"] == 0
+
+    notifs = db_session.query(Notification).filter(Notification.user_id == user.id).all()
+    assert len(notifs) == 0
+
+
+def test_concurrent_execution_idempotency(
+    client: TestClient, db_session: Session
+) -> None:
+    """Idempotency keys and DB constraints gracefully prevent duplicate inserts."""
+    _, email = create_user_and_token(client, "concurrent_test@example.com")
+    user = db_session.query(User).filter(User.email == email).first()
+    assert user is not None
+
+    test_key = f"concurrent-test-key-{uuid4()}"
+
+    # First attempt: successfully creates record
+    notif1, created1 = NotificationService.create_notification_record(
+        db=db_session,
+        user_id=user.id,
+        notification_type="system",
+        title="Test Title",
+        message="Test Message",
+        idempotency_key=test_key,
+    )
+    assert created1 is True
+    assert notif1 is not None
+
+    # Second attempt (simulating concurrent worker or retry): returns existing record
+    notif2, created2 = NotificationService.create_notification_record(
+        db=db_session,
+        user_id=user.id,
+        notification_type="system",
+        title="Test Title",
+        message="Test Message",
+        idempotency_key=test_key,
+    )
+    assert created2 is False
+    assert notif2.id == notif1.id
+
+    # Database count must be exactly 1
+    count = (
+        db_session.query(Notification)
+        .filter(Notification.idempotency_key == test_key)
+        .count()
+    )
+    assert count == 1

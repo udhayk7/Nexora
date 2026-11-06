@@ -120,3 +120,4 @@ def trigger_process_reminders(
     return NotificationService.process_reminders(
         db=db, target_user_id=current_user.id
     )
+

@@ -319,11 +319,16 @@ All API errors return a uniform, predictable JSON shape:
   - Timezone personalization: `preferred_timezone` (validated against standard IANA `zoneinfo`).
   - Disabling categories prevents future notifications without erasing notification history.
 - **Automated Celery & Redis Reminder Processing**:
-  - Celery task `process_scheduled_reminders_task` registered in worker and beat schedule.
-  - Automatically scans upcoming interview rounds, assessment tasks, deadlines, and follow-ups within 24h and 1h intervals.
+  - Celery task `process_scheduled_reminders_task` registered in worker and beat schedule (15-minute periodic beat).
+  - Corrected Non-Overlapping Reminder Windows (Prompt 12.1):
+    - **24-hour reminder**: Evaluates when `timedelta(hours=22) <= delta <= timedelta(hours=24, minutes=15)`. Uses a 15-minute execution window with a 2-hour recovery grace period for Celery/Redis restarts.
+    - **1-hour reminder**: Evaluates when `timedelta(0) < delta <= timedelta(hours=1, minutes=15)`. Recovers missed reminders down to the exact event start.
+    - **No False 24h Triggers**: An event 30 minutes away (`delta = 30m < 22h`) will never trigger a 24-hour reminder, only triggering the 1-hour reminder if enabled.
+    - **Zero Past Reminders**: If `delta <= 0` or `scheduled_utc <= now`, no reminders are ever generated for already started or past events.
+    - Applied identically to both interview rounds and take-home/online assessments.
   - Timezone-aware message rendering: formats localized event times using the candidate's configured IANA timezone (e.g. `ZoneInfo("America/New_York")`).
   - Exclusion guards: Skips completed or cancelled interviews and rejected or withdrawn applications.
-  - Strict idempotency key convention: `reminder:{type}:{interval}:{entity_id}` guarantees zero duplicates across task retries.
+  - Strict idempotency key convention: `reminder:{type}:{interval}:{entity_id}` guarantees zero duplicates across task retries and concurrent workers via database uniqueness constraint `uq_notifications_user_idempotency` with automatic rollback and existing record return upon `IntegrityError`.
 - **Frontend Notification Center & Global Bell**:
   - Global `NotificationBell` in dashboard navigation with real-time unread badge, popover dropdown for fast reads and action URL navigation.
   - Dedicated `/dashboard/notifications` workspace with category tab filtering (All, Unread, Interviews, Deadlines, Preferences), mark-all-read action, deletion, and interactive preference manager.
