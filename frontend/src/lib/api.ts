@@ -779,6 +779,15 @@ export interface JobMatchFilterParams {
 }
 
 // ---------------------------------------------------------------------------
+// Resume API Client
+// ---------------------------------------------------------------------------
+
+export const resumesApi = {
+  listResumes: () => apiClient<ResumeSummary[]>("/resumes"),
+  getResume: (id: string) => apiClient<ResumeDetail>(`/resumes/${id}`),
+};
+
+// ---------------------------------------------------------------------------
 // Matching & Ranking API Client
 // ---------------------------------------------------------------------------
 
@@ -927,5 +936,328 @@ export const tailoringApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+};
+
+// Application Management Interfaces
+export type ApplicationStatus =
+  | "interested"
+  | "preparing"
+  | "applied"
+  | "shortlisted"
+  | "assessment"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "withdrawn";
+
+export type ApplicationChannel =
+  | "official_portal"
+  | "email"
+  | "referral"
+  | "external_form"
+  | "other";
+
+export interface ApplicationStatusHistory {
+  id: string;
+  application_id: string;
+  from_status?: ApplicationStatus | null;
+  to_status: ApplicationStatus;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface ApplicationActivity {
+  id: string;
+  application_id: string;
+  user_id: string;
+  activity_type:
+    | "status_change"
+    | "submission"
+    | "note"
+    | "interview"
+    | "assessment"
+    | "recruiter_contact"
+    | "follow_up"
+    | "other";
+  title: string;
+  description?: string | null;
+  metadata_json?: Record<string, unknown> | null;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationInterview {
+  id: string;
+  application_id: string;
+  user_id: string;
+  round_number: number;
+  interview_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  meeting_url?: string | null;
+  interviewers: string[];
+  preparation_notes?: string | null;
+  feedback?: string | null;
+  outcome?: "pending" | "passed" | "failed" | "cancelled" | "waived" | null;
+  status: "scheduled" | "completed" | "cancelled" | "rescheduled";
+  next_steps?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobApplicationSummary {
+  id: string;
+  user_id: string;
+  job_id?: string | null;
+  company_id?: string | null;
+  title: string;
+  company_name: string;
+  status: ApplicationStatus;
+  application_channel: ApplicationChannel;
+  applied_at?: string | null;
+  submission_confirmed: boolean;
+  link_opened_at?: string | null;
+  application_url?: string | null;
+  deadline_at?: string | null;
+  next_follow_up_at?: string | null;
+  resume_id?: string | null;
+  resume_version_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobApplicationDetail extends JobApplicationSummary {
+  notes?: string | null;
+  recruiter_name?: string | null;
+  recruiter_email?: string | null;
+  recruiter_phone?: string | null;
+  recruiter_linkedin_url?: string | null;
+  salary_offered?: number | null;
+  currency?: string | null;
+  location_workplace_type?: string | null;
+  metadata_json?: Record<string, unknown> | null;
+  status_history: ApplicationStatusHistory[];
+  activities: ApplicationActivity[];
+  interviews: ApplicationInterview[];
+}
+
+export interface JobApplicationListResponse {
+  items: JobApplicationSummary[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface UpcomingEvent {
+  type: "deadline" | "follow_up" | "interview" | "assessment";
+  title: string;
+  date: string;
+  application_id: string;
+  meeting_url?: string;
+}
+
+export interface ApplicationAnalytics {
+  total_applications: number;
+  in_progress_count: number;
+  interviews_scheduled_count: number;
+  assessments_pending_count: number;
+  offers_count: number;
+  rejections_count: number;
+  upcoming_deadlines_count: number;
+  upcoming_follow_ups_count: number;
+  status_distribution: Record<string, number>;
+  channel_distribution: Record<string, number>;
+  activity_trend: Array<{ week: string; count: number }>;
+  upcoming_events: UpcomingEvent[];
+}
+
+export interface CreateApplicationPayload {
+  title: string;
+  company_name: string;
+  job_id?: string | null;
+  company_id?: string | null;
+  status?: ApplicationStatus;
+  application_channel?: ApplicationChannel;
+  applied_at?: string | null;
+  submission_confirmed?: boolean;
+  application_url?: string | null;
+  deadline_at?: string | null;
+  next_follow_up_at?: string | null;
+  notes?: string | null;
+  resume_id?: string | null;
+  resume_version_id?: string | null;
+  recruiter_name?: string | null;
+  recruiter_email?: string | null;
+  recruiter_phone?: string | null;
+  recruiter_linkedin_url?: string | null;
+  salary_offered?: number | null;
+  currency?: string | null;
+  location_workplace_type?: string | null;
+}
+
+export interface UpdateApplicationPayload {
+  title?: string;
+  company_name?: string;
+  status?: ApplicationStatus;
+  application_channel?: ApplicationChannel;
+  applied_at?: string | null;
+  submission_confirmed?: boolean;
+  application_url?: string | null;
+  deadline_at?: string | null;
+  next_follow_up_at?: string | null;
+  notes?: string | null;
+  resume_id?: string | null;
+  resume_version_id?: string | null;
+  recruiter_name?: string | null;
+  recruiter_email?: string | null;
+  recruiter_phone?: string | null;
+  recruiter_linkedin_url?: string | null;
+  salary_offered?: number | null;
+  currency?: string | null;
+  location_workplace_type?: string | null;
+}
+
+export interface CreateActivityPayload {
+  activity_type:
+    | "status_change"
+    | "submission"
+    | "note"
+    | "interview"
+    | "assessment"
+    | "recruiter_contact"
+    | "follow_up"
+    | "other";
+  title: string;
+  description?: string;
+  occurred_at?: string;
+  metadata_json?: Record<string, unknown>;
+}
+
+export interface CreateInterviewPayload {
+  round_number?: number;
+  interview_type: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes?: number;
+  meeting_url?: string;
+  interviewers?: string[];
+  preparation_notes?: string;
+  feedback?: string;
+  outcome?: "pending" | "passed" | "failed" | "cancelled" | "waived";
+  status?: "scheduled" | "completed" | "cancelled" | "rescheduled";
+  next_steps?: string;
+}
+
+export interface UpdateInterviewPayload {
+  round_number?: number;
+  interview_type?: string;
+  title?: string;
+  scheduled_at?: string;
+  duration_minutes?: number;
+  meeting_url?: string;
+  interviewers?: string[];
+  preparation_notes?: string;
+  feedback?: string;
+  outcome?: "pending" | "passed" | "failed" | "cancelled" | "waived";
+  status?: "scheduled" | "completed" | "cancelled" | "rescheduled";
+  next_steps?: string;
+}
+
+export const applicationsApi = {
+  getAnalytics: () => apiClient<ApplicationAnalytics>("/applications/analytics"),
+
+  listApplications: (params?: {
+    status?: ApplicationStatus;
+    channel?: ApplicationChannel;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.append("status", params.status);
+    if (params?.channel) q.append("channel", params.channel);
+    if (params?.search) q.append("search", params.search);
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<JobApplicationListResponse>(`/applications${qs ? `?${qs}` : ""}`);
+  },
+
+  getApplication: (id: string) => apiClient<JobApplicationDetail>(`/applications/${id}`),
+
+  createApplication: (payload: CreateApplicationPayload) =>
+    apiClient<JobApplicationDetail>("/applications", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateApplication: (id: string, payload: UpdateApplicationPayload) =>
+    apiClient<JobApplicationDetail>(`/applications/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  updateStatus: (
+    id: string,
+    payload: {
+      status: ApplicationStatus;
+      note?: string;
+      submission_confirmed?: boolean;
+      applied_at?: string;
+    }
+  ) =>
+    apiClient<JobApplicationDetail>(`/applications/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  markLinkOpened: (id: string) =>
+    apiClient<JobApplicationSummary>(`/applications/${id}/open-link`, {
+      method: "POST",
+    }),
+
+  deleteApplication: (id: string) =>
+    apiClient<{ message: string }>(`/applications/${id}`, {
+      method: "DELETE",
+    }),
+
+  createActivity: (applicationId: string, payload: CreateActivityPayload) =>
+    apiClient<ApplicationActivity>(`/applications/${applicationId}/activities`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteActivity: (applicationId: string, activityId: string) =>
+    apiClient<{ message: string }>(
+      `/applications/${applicationId}/activities/${activityId}`,
+      { method: "DELETE" }
+    ),
+
+  createInterview: (applicationId: string, payload: CreateInterviewPayload) =>
+    apiClient<ApplicationInterview>(`/applications/${applicationId}/interviews`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateInterview: (
+    applicationId: string,
+    interviewId: string,
+    payload: UpdateInterviewPayload
+  ) =>
+    apiClient<ApplicationInterview>(
+      `/applications/${applicationId}/interviews/${interviewId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }
+    ),
+
+  deleteInterview: (applicationId: string, interviewId: string) =>
+    apiClient<{ message: string }>(
+      `/applications/${applicationId}/interviews/${interviewId}`,
+      { method: "DELETE" }
+    ),
 };
 

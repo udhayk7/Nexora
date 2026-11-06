@@ -910,6 +910,21 @@ export default function MatchesPage() {
 
                     {job ? (
                       <Link
+                        href={`/dashboard/applications?action=new&jobId=${job.id}&title=${encodeURIComponent(
+                          job.title
+                        )}&company=${encodeURIComponent(job.company?.name || "")}&url=${encodeURIComponent(
+                          job.application_url || job.job_url || ""
+                        )}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-950/70 text-blue-300 border border-blue-800/50 hover:bg-blue-900 transition"
+                        title="Track in Application Tracker"
+                      >
+                        <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+                        Track
+                      </Link>
+                    ) : null}
+
+                    {job ? (
+                      <Link
                         href={`/dashboard/resumes/tailor?jobId=${job.id}`}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-950/70 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900 transition"
                         title="Tailor your resume for this opportunity"
@@ -1113,6 +1128,21 @@ export default function MatchesPage() {
               >
                 Close
               </button>
+              {detailMatch.job && (
+                <Link
+                  href={`/dashboard/applications?action=new&jobId=${detailMatch.job.id}&title=${encodeURIComponent(
+                    detailMatch.job.title
+                  )}&company=${encodeURIComponent(
+                    detailMatch.job.company?.name || ""
+                  )}&url=${encodeURIComponent(
+                    detailMatch.job.application_url || detailMatch.job.job_url || ""
+                  )}`}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition"
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  Track Application
+                </Link>
+              )}
               {detailMatch.job && (
                 <Link
                   href={`/dashboard/resumes/tailor?jobId=${detailMatch.job.id}`}

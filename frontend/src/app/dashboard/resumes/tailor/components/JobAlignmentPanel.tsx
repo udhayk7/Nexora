@@ -231,3 +231,4 @@ export function JobAlignmentPanel({ job, analysis }: JobAlignmentPanelProps) {
     </div>
   );
 }
+

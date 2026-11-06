@@ -1008,6 +1008,19 @@ export default function JobsPage() {
 
                     <div className="flex items-center gap-1.5">
                       <Link
+                        href={`/dashboard/applications?action=new&jobId=${job.id}&title=${encodeURIComponent(
+                          job.title
+                        )}&company=${encodeURIComponent(job.company?.name || "")}&url=${encodeURIComponent(
+                          job.application_url || job.job_url || ""
+                        )}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-blue-950/70 text-blue-300 border border-blue-800/50 hover:bg-blue-900 transition"
+                        title="Track this job in Application Tracker"
+                      >
+                        <Briefcase className="w-3 h-3 text-blue-400" />
+                        Track
+                      </Link>
+
+                      <Link
                         href={`/dashboard/resumes/tailor?jobId=${job.id}`}
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-indigo-950/70 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900 transition"
                         title="Tailor your resume for this requisition"
@@ -1503,7 +1516,20 @@ export default function JobsPage() {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-border flex justify-end">
+            <div className="pt-3 border-t border-border flex items-center justify-between">
+              <Link
+                href={`/dashboard/applications?action=new&jobId=${detailJob.id}&title=${encodeURIComponent(
+                  detailJob.title
+                )}&company=${encodeURIComponent(
+                  detailJob.company?.name || ""
+                )}&url=${encodeURIComponent(
+                  detailJob.application_url || detailJob.job_url || ""
+                )}`}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 transition"
+              >
+                <Briefcase className="w-3.5 h-3.5" /> Track Application
+              </Link>
+
               <button
                 onClick={() => setDetailJob(null)}
                 className="px-4 py-1.5 text-xs font-medium rounded-lg border border-border hover:bg-secondary"

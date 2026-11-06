@@ -10,6 +10,7 @@ from sqlalchemy.types import JSON
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.application import JobApplication
     from app.models.company import Company
     from app.models.match import JobMatch
     from app.models.tailoring import ResumeTailoringSession
@@ -214,6 +215,10 @@ class Job(Base, TimestampMixin):
         "ResumeTailoringSession",
         back_populates="job",
         cascade="all, delete-orphan",
+    )
+    applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
+        back_populates="job",
     )
 
 

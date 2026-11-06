@@ -9,6 +9,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.analysis import ResumeAnalysis
+    from app.models.application import JobApplication
     from app.models.company import Company
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
@@ -94,6 +95,11 @@ class User(Base, TimestampMixin):
     )
     tailoring_sessions: Mapped[list["ResumeTailoringSession"]] = relationship(
         "ResumeTailoringSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
         back_populates="user",
         cascade="all, delete-orphan",
     )

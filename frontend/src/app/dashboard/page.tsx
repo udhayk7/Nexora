@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Briefcase, Building2, FileText, LogOut, ShieldCheck, Sparkles, User } from "lucide-react";
+import { ArrowRight, Briefcase, Building2, CheckSquare, FileText, Layers, LogOut, ShieldCheck, Sparkles, User } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
 export default function DashboardPage() {
@@ -179,6 +179,46 @@ export default function DashboardPage() {
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               Personalized alignment scoring with transparent evidence citations, preference controls, and freshness trust badges.
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/applications"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <CheckSquare className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Track Applications <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              Application Management
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Centralized application tracker, 9-stage pipeline, interview scheduler, activity timeline, and database analytics.
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/resumes/tailor"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                <Layers className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open Studio <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              Resume Tailoring Studio
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Factual AI alignment, change-by-change acceptance, PDF compilation, and tailored resume export.
             </p>
           </Link>
         </div>

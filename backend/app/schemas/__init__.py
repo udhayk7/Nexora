@@ -1,5 +1,21 @@
 """Pydantic schemas package."""
 
+from app.schemas.application import (
+    ApplicationActivityCreate,
+    ApplicationActivityResponse,
+    ApplicationActivityUpdate,
+    ApplicationAnalyticsResponse,
+    ApplicationInterviewCreate,
+    ApplicationInterviewResponse,
+    ApplicationInterviewUpdate,
+    ApplicationStatusHistoryResponse,
+    JobApplicationCreate,
+    JobApplicationDetailResponse,
+    JobApplicationListResponse,
+    JobApplicationStatusUpdate,
+    JobApplicationSummaryResponse,
+    JobApplicationUpdate,
+)
 from app.schemas.health import HealthResponse
 from app.schemas.tailoring import (
     BatchChangeActionRequest,
@@ -32,5 +48,19 @@ __all__ = [
     "CompilePDFRequest",
     "CompilePDFResponse",
     "TailoredVersionResponse",
+    "JobApplicationCreate",
+    "JobApplicationUpdate",
+    "JobApplicationStatusUpdate",
+    "JobApplicationSummaryResponse",
+    "JobApplicationDetailResponse",
+    "JobApplicationListResponse",
+    "ApplicationStatusHistoryResponse",
+    "ApplicationActivityCreate",
+    "ApplicationActivityUpdate",
+    "ApplicationActivityResponse",
+    "ApplicationInterviewCreate",
+    "ApplicationInterviewUpdate",
+    "ApplicationInterviewResponse",
+    "ApplicationAnalyticsResponse",
 ]
 

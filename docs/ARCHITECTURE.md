@@ -274,6 +274,37 @@ All API errors return a uniform, predictable JSON shape:
 - **Audit Logging**:
   - Emits `tailoring.session_created`, `tailoring.change_status_updated`, `tailoring.batch_changes_updated`, `tailoring.latex_updated`, and `tailoring.version_saved`.
 
+### 15. Application Management System Architecture (`backend/app/models/application.py`, `services/application_service.py`, `frontend/src/app/dashboard/applications/`)
+- **Centralized Application Tracker (`job_applications`)**:
+  - Persists tracked job applications scoped strictly to `user_id`.
+  - Supports standalone manual applications without requiring an existing job requisition or company record.
+  - Relational connections: optional foreign keys to `job_id`, `company_id`, `resume_id`, and `resume_version_id`.
+  - Tracks `application_channel` (`official_portal`, `email`, `referral`, `external_form`, `other`), `status` (9-stage lifecycle), `submission_confirmed` boolean, `link_opened_at`, `application_url`, `deadline_at`, `next_follow_up_at`, `notes`, recruiter contacts, and flexible metadata JSON.
+  - **Non-Destructive Deletion**: Deleting an application deletes associated activities, interviews, and status history via `cascade="all, delete-orphan"`, but preserves shared `Job`, `Company`, and `Resume` entities intact.
+- **Strict No-False-Submission Guarantee**:
+  - Opening an application link (`POST /api/v1/applications/{id}/open-link`) updates `link_opened_at` without marking `submission_confirmed = true` or automatically transitioning status to `applied`.
+  - Submissions require explicit user confirmation.
+- **9-Stage Application Pipeline & Immutable Audit History (`application_status_history`)**:
+  - Stages: `interested`, `preparing`, `applied`, `shortlisted`, `assessment`, `interview`, `offer`, `rejected`, `withdrawn`.
+  - Every status transition creates an immutable historical audit record with `from_status`, `to_status`, optional `note`, and timestamp.
+- **Chronological Activity Timeline (`application_activities`)**:
+  - Audited activity events tracking submissions, status changes, manual user notes, recruiter communications, interviews, and follow-ups. Full user CRUD for manual notes and activities.
+- **Interview & Assessment Manager (`application_interviews`)**:
+  - Tracks individual interview and assessment rounds: `round_number`, `interview_type`, `scheduled_at`, `duration_minutes`, `meeting_url`, `interviewers` (JSON list), `preparation_notes`, `feedback`, `outcome` (`pending`, `passed`, `failed`, `cancelled`, `waived`), and `status` (`scheduled`, `completed`, `cancelled`, `rescheduled`).
+  - Strict manual control: no automated calendar sync or email sending.
+- **100% Real Database Analytics (`GET /api/v1/applications/analytics`)**:
+  - Computes exact metrics directly from database rows with zero mock or hardcoded statistics:
+    - Total applications, in progress, interviews scheduled, assessments pending, offers, rejections.
+    - Upcoming events (deadlines, follow-ups, interviews, assessments) occurring within 14 days.
+    - Status distribution counts across all 9 stages.
+    - Channel distribution counts across all channels.
+    - 6-week rolling activity trend.
+- **Frontend Workspace & Integration Shortcuts**:
+  - `/dashboard/applications`: Full responsive workspace with KPI summary cards, 9-stage pipeline filter bar, search/channel filters, table with quick status transitions, slide-over detail drawer with timeline and interview scheduler, and manual application entry modal.
+  - "Track Application" shortcut links seamlessly integrated on Job Cards (`/dashboard/jobs`), Job Details modal, and Job Matches (`/dashboard/matches`), pre-populating requisition details.
+- **Audit Logging**:
+  - Emits `application.created`, `application.status_changed`, `application.updated`, `application.link_opened`, `application.deleted`, `application.activity_created`, `application.activity_deleted`, `application.interview_scheduled`, `application.interview_updated`, and `application.interview_deleted`.
+
 ---
 
 ## Token & Cookie Security Strategy

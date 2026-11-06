@@ -10,6 +10,7 @@ from sqlalchemy.types import JSON
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.application import JobApplication
     from app.models.job import Job
     from app.models.user import User
 
@@ -153,6 +154,10 @@ class Company(Base, TimestampMixin):
     )
     jobs: Mapped[list["Job"]] = relationship(
         "Job",
+        back_populates="company",
+    )
+    applications: Mapped[list["JobApplication"]] = relationship(
+        "JobApplication",
         back_populates="company",
     )
 

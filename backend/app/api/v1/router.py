@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.applications import applications_router
 from app.api.v1.auth import auth_router
 from app.api.v1.companies import companies_router
 from app.api.v1.jobs import jobs_router
@@ -31,3 +32,4 @@ api_router.include_router(companies_router)
 api_router.include_router(jobs_router)
 api_router.include_router(matches_router)
 api_router.include_router(tailoring_router)
+api_router.include_router(applications_router)

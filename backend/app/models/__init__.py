@@ -1,6 +1,12 @@
 """SQLAlchemy models package."""
 
 from app.models.analysis import ResumeAnalysis
+from app.models.application import (
+    ApplicationActivity,
+    ApplicationInterview,
+    ApplicationStatusHistory,
+    JobApplication,
+)
 from app.models.base import Base
 from app.models.company import Company, CompanySource
 from app.models.job import Job, JobSource, JobVerification
@@ -26,4 +32,8 @@ __all__ = [
     "JobMatch",
     "ResumeTailoringSession",
     "ResumeTailoringChange",
+    "JobApplication",
+    "ApplicationStatusHistory",
+    "ApplicationActivity",
+    "ApplicationInterview",
 ]
