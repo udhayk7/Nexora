@@ -16,9 +16,7 @@ from app.schemas.health import HealthResponse
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan management."""
     configure_logging()
-    logger.info(
-        f"Starting {settings.PROJECT_NAME} v{settings.VERSION} [{settings.ENVIRONMENT}]"
-    )
+    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} [{settings.ENVIRONMENT}]")
     yield
     logger.info(f"Shutting down {settings.PROJECT_NAME}")
 

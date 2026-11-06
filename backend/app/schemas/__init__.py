@@ -79,4 +79,3 @@ __all__ = [
     "UserNotificationPreferenceUpdate",
     "ProcessRemindersResponse",
 ]
-

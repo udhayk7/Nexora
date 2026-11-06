@@ -354,5 +354,3 @@ class JobVerification(Base, TimestampMixin):
         "User",
         foreign_keys=[verifier_user_id],
     )
-
-

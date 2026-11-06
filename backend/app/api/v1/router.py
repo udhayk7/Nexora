@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.applications import applications_router
 from app.api.v1.auth import auth_router
 from app.api.v1.companies import companies_router
+from app.api.v1.discovery import router as discovery_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.matches import matches_router
 from app.api.v1.notifications import router as notifications_router
@@ -35,3 +36,4 @@ api_router.include_router(matches_router)
 api_router.include_router(tailoring_router)
 api_router.include_router(applications_router)
 api_router.include_router(notifications_router)
+api_router.include_router(discovery_router, prefix="/discovery", tags=["Job Discovery"])

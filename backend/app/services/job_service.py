@@ -371,9 +371,7 @@ class JobService:
         if not job:
             raise NotFoundError("Job opportunity record not found")
 
-        formatted_sources = [
-            JobSourceResponse.model_validate(s) for s in (job.sources or [])
-        ]
+        formatted_sources = [JobSourceResponse.model_validate(s) for s in (job.sources or [])]
         formatted_verifications = [
             JobVerificationResponse.model_validate(v) for v in (job.verification_history or [])
         ]
@@ -1011,16 +1009,10 @@ class JobService:
                 existing_job: Optional[Job] = None
                 if canon_hash:
                     existing_job = (
-                        db.query(Job)
-                        .filter(Job.canonical_url_hash == canon_hash)
-                        .first()
+                        db.query(Job).filter(Job.canonical_url_hash == canon_hash).first()
                     )
 
-                if (
-                    not existing_job
-                    and rec.external_source_id
-                    and rec.external_source_id.strip()
-                ):
+                if not existing_job and rec.external_source_id and rec.external_source_id.strip():
                     existing_job = (
                         db.query(Job)
                         .filter(Job.external_source_id == rec.external_source_id.strip())

@@ -99,9 +99,7 @@ def check_duplicates(
     _: User = Depends(get_current_active_user),
 ) -> JobDuplicateCheckResponse:
     """Check for duplicate job records by canonical URL or company/title clustering."""
-    return JobService.check_duplicates(
-        db=db, job_url=job_url, title=title, company_id=company_id
-    )
+    return JobService.check_duplicates(db=db, job_url=job_url, title=title, company_id=company_id)
 
 
 @jobs_router.post(

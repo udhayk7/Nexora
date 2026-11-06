@@ -129,4 +129,3 @@ class GeminiProvider(AIProvider):
 
         logger.error(f"Gemini analysis failed after retries: {last_exception}")
         raise AIProviderError(f"Gemini analysis failed: {last_exception}") from last_exception
-

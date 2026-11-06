@@ -139,4 +139,3 @@ class LocalStorageService:
 
 # Global default storage service instance
 storage_service = LocalStorageService()
-

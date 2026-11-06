@@ -35,9 +35,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception:
             duration_ms = (time.perf_counter() - start_time) * 1000
-            logger.error(
-                f"Failed {request.method} {request.url.path} after {duration_ms:.2f}ms"
-            )
+            logger.error(f"Failed {request.method} {request.url.path} after {duration_ms:.2f}ms")
             raise
 
         duration_ms = (time.perf_counter() - start_time) * 1000

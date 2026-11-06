@@ -143,9 +143,7 @@ class MatchingService:
                 version_id = latest_resume.current_version_id
         else:
             resume = (
-                db.query(Resume)
-                .filter(Resume.id == resume_id, Resume.user_id == user.id)
-                .first()
+                db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == user.id).first()
             )
             if not resume:
                 raise NotFoundError("Specified resume not found or does not belong to you.")

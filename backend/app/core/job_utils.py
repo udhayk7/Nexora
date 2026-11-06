@@ -42,9 +42,7 @@ def canonicalize_job_url(url: Optional[str]) -> Optional[str]:
 
         # Filter out tracking query params while preserving meaningful resource params
         query_pairs = parse_qsl(parsed.query, keep_blank_values=False)
-        filtered_pairs = [
-            (k, v) for k, v in query_pairs if k.lower() not in _TRACKING_QUERY_PARAMS
-        ]
+        filtered_pairs = [(k, v) for k, v in query_pairs if k.lower() not in _TRACKING_QUERY_PARAMS]
         filtered_query = urlencode(filtered_pairs)
 
         canonical = urlunparse((parsed.scheme.lower(), netloc, path, "", filtered_query, ""))
@@ -81,4 +79,3 @@ def normalize_job_title(title: str) -> str:
     cleaned = re.sub(r"[^\w\s]", " ", lowered)
     tokens = [t for t in cleaned.split() if t]
     return " ".join(tokens)
-

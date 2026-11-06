@@ -90,9 +90,7 @@ class TailoringAnalyzer:
                 canonical = candidate_skills_norm[req_norm]
                 if canonical not in relevant_skills:
                     relevant_skills.append(canonical)
-            elif any(
-                req_norm in s_norm or s_norm in req_norm for s_norm in candidate_skills_norm
-            ):
+            elif any(req_norm in s_norm or s_norm in req_norm for s_norm in candidate_skills_norm):
                 matched_s = next(
                     candidate_skills_norm[s_norm]
                     for s_norm in candidate_skills_norm

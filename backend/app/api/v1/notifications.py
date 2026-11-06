@@ -103,9 +103,7 @@ def update_notification_preferences(
     current_user: User = Depends(get_current_user),
 ) -> UserNotificationPreferenceResponse:
     """Update notification preferences, intervals, categories, and timezone."""
-    return NotificationService.update_preferences(
-        db=db, user_id=current_user.id, data=data
-    )
+    return NotificationService.update_preferences(db=db, user_id=current_user.id, data=data)
 
 
 @router.post("/process-reminders", response_model=ProcessRemindersResponse)
@@ -117,7 +115,4 @@ def trigger_process_reminders(
     On-demand trigger to scan and evaluate scheduled reminders for upcoming
     interviews, assessments, deadlines, and follow-ups.
     """
-    return NotificationService.process_reminders(
-        db=db, target_user_id=current_user.id
-    )
-
+    return NotificationService.process_reminders(db=db, target_user_id=current_user.id)

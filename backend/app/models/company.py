@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -208,9 +208,135 @@ class CompanySource(Base, TimestampMixin):
         default=dict,
         nullable=False,
     )
+    # Automated Discovery Configuration & Status
+    adapter_name: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+    )
+    board_token: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+        index=True,
+    )
+    scan_frequency_hours: Mapped[int] = mapped_column(
+        Integer,
+        default=24,
+        nullable=False,
+    )
+    last_successful_scan_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_scan_status: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    last_scan_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    jobs_discovered_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    error_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
 
     # Relationships
     company: Mapped["Company"] = relationship(
         "Company",
         back_populates="sources",
+    )
+    scan_logs: Mapped[list["DiscoveryScanLog"]] = relationship(
+        "DiscoveryScanLog",
+        back_populates="company_source",
+        cascade="all, delete-orphan",
+        order_by="desc(DiscoveryScanLog.started_at)",
+    )
+
+
+class DiscoveryScanLog(Base, TimestampMixin):
+    """Execution log for automated and manual company discovery scans."""
+
+    __tablename__ = "discovery_scan_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    company_source_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("company_sources.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    company_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    adapter_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+    scan_type: Mapped[str] = mapped_column(
+        String(50),
+        default="scheduled",
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+    jobs_found: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    jobs_imported: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    jobs_updated: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        nullable=False,
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        default=dict,
+        nullable=False,
+    )
+
+    # Relationships
+    company_source: Mapped[Optional["CompanySource"]] = relationship(
+        "CompanySource",
+        back_populates="scan_logs",
+    )
+    company: Mapped[Optional["Company"]] = relationship(
+        "Company",
     )

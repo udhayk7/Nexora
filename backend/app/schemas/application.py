@@ -299,4 +299,3 @@ class ApplicationAnalyticsResponse(BaseModel):
     channel_distribution: dict[str, int]
     activity_trend: list[dict[str, Any]]
     upcoming_events: list[dict[str, Any]]
-

@@ -248,4 +248,3 @@ def save_tailored_version(
         req=req,
     )
     return TailoredVersionResponse.model_validate(version)
-

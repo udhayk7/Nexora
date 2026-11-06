@@ -62,9 +62,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify plaintext password against bcrypt hash in constant time."""
     try:
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"), hashed_password.encode("utf-8")
-        )
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception:
         return False
 
@@ -168,4 +166,3 @@ def decode_token(token: str, expected_type: str = "access") -> dict[str, Any]:
         )
 
     return payload
-

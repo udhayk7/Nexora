@@ -488,9 +488,7 @@ class TailoringService:
             file_size = base_version.file_size
 
         # 4. Count accepted modifications
-        accepted_count = sum(
-            1 for c in session.changes if c.status in ("accepted", "modified")
-        )
+        accepted_count = sum(1 for c in session.changes if c.status in ("accepted", "modified"))
 
         title = req.title or f"Tailored for {job.title} at {comp_name}"
 

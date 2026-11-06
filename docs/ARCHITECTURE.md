@@ -335,6 +335,44 @@ All API errors return a uniform, predictable JSON shape:
 - **Audit Logging**:
   - Emits `notification.created`, `notification.read`, `notification.read_all`, `notification.deleted`, and `notification.preferences_updated`.
 
+### 17. Automated Job Discovery & Source Integrations Architecture (`backend/app/services/discovery/`, `models/company.py`, `tasks/discovery_tasks.py`, `frontend/src/app/dashboard/discovery/`)
+- **Modular Source-Adapter Architecture (`backend/app/services/discovery/adapters/`)**:
+  - Pluggable, extensible adapter pattern inheriting from `BaseSourceAdapter`:
+    - `GreenhouseAdapter`: Consumes Greenhouse v1 public job board API (`https://boards-api.greenhouse.io/v1/boards/{token}/jobs?content=true`). Supports single-request full job content retrieval with department and location extraction.
+    - `LeverAdapter`: Consumes Lever v0 public postings API (`https://api.lever.co/v0/postings/{site}?mode=json`). Extracts structured requirements and lists from `lists` payload.
+    - `AshbyAdapter`: Consumes Ashby public job-board API (`https://api.ashbyhq.com/posting-api/job-board/{board_name}`). Parses structured compensation tiers (`compensationTierSummary`) and department metadata.
+    - `RSSFeedAdapter`: Parses standard RSS 2.0 and Atom XML feeds with safe XML handling (defending against entity expansion and external entity vulnerabilities) and HTML stripping.
+    - `JSONFeedAdapter`: Parses generic JSON job feeds supporting root arrays, nested listing wrappers, and property normalization.
+  - Adapter registry (`registry.py`) provides dynamic lookup and supported adapter introspection.
+- **SSRF-Safe Outbound Request Engine (`safe_get`)**:
+  - Outbound HTTP requests route through `safe_get` wrapping `url_validator.validate_url`.
+  - Blocks loopback, private IPv4/IPv6 RFC 1918 subnets, AWS/GCP/Azure link-local cloud metadata addresses (`169.254.169.254`), and prohibited ports.
+  - Inspects every HTTP redirect hop to prevent redirect-based SSRF.
+  - Adheres to standard polite crawling practices: identified `NexoraBot/1.0` User-Agent, configurable timeout (15s), and exponential backoff on HTTP 429 rate limit responses.
+- **Deterministic Job Normalization Engine (`backend/app/services/discovery/normalizer.py`)**:
+  - **10 Nexora Role Families**: Deterministic keyword scoring categorizing listings into `Frontend Engineering`, `Backend Engineering`, `Full Stack Engineering`, `Mobile Development`, `DevOps & Cloud Infrastructure`, `Data Engineering`, `Data Science & Machine Learning`, `QA & Test Automation`, `Cybersecurity & InfoSec`, and `Product & Engineering Management`.
+  - **Early Career Classification**: Classifies seniority into `fresher` (0-1 yrs, new grad, campus, intern), `junior` (1-3 yrs), `mid` (3-5 yrs), or `senior` (5+ yrs).
+  - **Work Arrangement & Employment Type**: Accurately infers `remote`, `hybrid`, or `on_site` and distinguishes `full_time`, `part_time`, `internship`, and `contract`.
+  - **Strict Undisclosed Salary Truthfulness**: Extracts explicit compensation figures for INR LPA (supports both Western comma grouping and Indian comma format like `₹8,00,000`), USD, EUR, and GBP. Never invents or infers undisclosed salaries.
+  - **Skill Synonym Normalization**: Recognizes and canonicalizes aliases (e.g. `react.js` $\rightarrow$ `react`, `k8s` $\rightarrow$ `kubernetes`, `tailwind` $\rightarrow$ `tailwindcss`, `postgres` $\rightarrow$ `postgresql`).
+- **Idempotent Ingestion & Provenance Preservation (`JobDiscoveryService`)**:
+  - Deduplication pipeline checks SHA-256 canonical URL hash (`canonical_url_hash`), external source ID (`external_id`), and company-title pair.
+  - Preserves user edits on existing jobs while updating freshness timestamps (`last_seen_at`, `last_checked_at`).
+  - Automatically records citation provenance in `job_sources` with external source ID and adapter attribution.
+  - Automated Corroboration: Sets newly discovered listings to `corroborated` verification status and appends a `job_verifications` audit event (`verifier_type="system"`, `observed_status="active"`, `verification_outcome="corroborated"`). Discovered jobs are never automatically promoted to `verified` without listing-level or human verification.
+- **Celery Background Scanning & Audit Logs (`tasks/discovery_tasks.py`, `models/company.py`)**:
+  - `scan_all_due_sources_task`: Hourly periodic Celery beat task evaluating enabled sources whose elapsed time exceeds `scan_frequency_hours`.
+  - `scan_single_company_source_task`: Async Celery task for on-demand scans.
+  - `discovery_scan_logs`: Immutable audit table tracking every scan: `company_source_id`, `company_id`, `adapter_name`, `scan_type` (`manual`, `scheduled`), `status` (`running`, `success`, `failed`, `partial`), `jobs_found`, `jobs_imported`, `jobs_updated`, `error_message`, and execution timings.
+- **Frontend Discovery Workspace (`frontend/src/app/dashboard/discovery/`)**:
+  - Responsive workspace featuring:
+    - Overview KPIs: Active Sources, Total Discovered Opportunities, Jobs Imported Today, Scans Completed Today.
+    - Discovered Opportunities Tab: Searchable, filterable list of discovered early-career roles with role family, arrangement, freshness, verification tags, and details modal.
+    - Source Integrations Tab: Table of configured sources with active toggle, scan frequency, last scan status badge, manual "Scan Now" button, and "Add Source" modal featuring live connection testing.
+    - Scan History Tab: Audit logs table detailing every scan attempt, run duration, jobs found/imported/updated, and error messages.
+- **Audit Logging**:
+  - Emits `company_source.created`, `company_source.updated`, `company_source.deleted`, `discovery.test_connection`, `discovery.scan_started`, `discovery.scan_completed`, `discovery.scan_failed`, and `job.corroborated`.
+
 ---
 
 ## Token & Cookie Security Strategy

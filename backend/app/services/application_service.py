@@ -294,12 +294,8 @@ class ApplicationService:
         history_items = [
             ApplicationStatusHistoryResponse.model_validate(h) for h in app.status_history
         ]
-        activity_items = [
-            ApplicationActivityResponse.model_validate(act) for act in app.activities
-        ]
-        interview_items = [
-            ApplicationInterviewResponse.model_validate(iv) for iv in app.interviews
-        ]
+        activity_items = [ApplicationActivityResponse.model_validate(act) for act in app.activities]
+        interview_items = [ApplicationInterviewResponse.model_validate(iv) for iv in app.interviews]
 
         resume_title = app.resume.title if app.resume else None
         version_num = app.resume_version.version_number if app.resume_version else None
@@ -476,12 +472,8 @@ class ApplicationService:
             else:
                 act_type = "status_changed"
                 act_title = f"Status: {new_status.capitalize()}"
-                act_desc = (
-                    data.notes
-                    or (
-                        f"Status changed from {old_status.capitalize()} "
-                        f"to {new_status.capitalize()}."
-                    )
+                act_desc = data.notes or (
+                    f"Status changed from {old_status.capitalize()} to {new_status.capitalize()}."
                 )
 
             activity = ApplicationActivity(
@@ -946,16 +938,12 @@ class ApplicationService:
             for iv in raw_interviews
             if iv.scheduled_at and _ensure_utc(iv.scheduled_at) >= now  # type: ignore[operator]
         ]
-        interviews.sort(
-            key=lambda iv: _ensure_utc(iv.scheduled_at) or now
-        )
+        interviews.sort(key=lambda iv: _ensure_utc(iv.scheduled_at) or now)
 
         interviews_scheduled_count = sum(
             1 for iv in interviews if "assessment" not in iv.interview_type
         )
-        assessments_pending_count = sum(
-            1 for iv in interviews if "assessment" in iv.interview_type
-        )
+        assessments_pending_count = sum(1 for iv in interviews if "assessment" in iv.interview_type)
 
         for iv in interviews:
             is_assessment = "assessment" in iv.interview_type

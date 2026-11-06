@@ -32,4 +32,3 @@ def get_ai_provider(provider_name: Optional[str] = None) -> AIProvider:
     raise AIConfigurationError(
         f"Unsupported AI provider '{selected}'. Supported providers are 'gemini' and 'openai'."
     )
-

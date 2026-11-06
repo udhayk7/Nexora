@@ -204,4 +204,3 @@ def safe_check_url_status(
             return False, None, f"Check failed: {exc}"
 
     return False, None, "Exceeded maximum redirects"
-

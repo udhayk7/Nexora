@@ -8,9 +8,7 @@ from typing import Any
 from app.core.config import settings
 
 # Context variable for request correlation ID
-request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "request_id", default="system"
-)
+request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="system")
 
 
 def get_request_id() -> str:
@@ -120,4 +118,3 @@ def configure_logging() -> None:
 
 
 logger = logging.getLogger("nexora")
-

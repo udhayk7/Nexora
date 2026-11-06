@@ -93,4 +93,3 @@ class ResumeAnalysis(Base, TimestampMixin):
         "ResumeVersion",
         back_populates="analyses",
     )
-

@@ -248,9 +248,7 @@ def get_resume(
 ) -> ResumeDetailResponse:
     """Retrieve full resume details with structured profile and version list."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -272,9 +270,7 @@ async def upload_resume_version(
 ) -> ResumeVersionDetail:
     """Upload and parse a new version for an existing resume record."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -283,9 +279,7 @@ async def upload_resume_version(
     content = await file.read()
     file_type = _validate_and_extract_type(original_filename, content)
 
-    next_version_num = (
-        max((v.version_number for v in resume.versions), default=0) + 1
-    )
+    next_version_num = max((v.version_number for v in resume.versions), default=0) + 1
     version_id = uuid.uuid4()
 
     storage_path = storage_service.save_file(
@@ -349,9 +343,7 @@ def list_resume_versions(
 ) -> list[ResumeVersionSummary]:
     """List all versions of a specific resume."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -378,9 +370,7 @@ def get_resume_version(
 ) -> ResumeVersionDetail:
     """Retrieve details and parsed content of a specific resume version."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -408,9 +398,7 @@ def download_resume(
 ) -> Response:
     """Download the original source document for a resume or specific version."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -498,9 +486,7 @@ def delete_resume(
 ) -> Response:
     """Delete a resume, all its versions from database, and remove stored files."""
     resume = (
-        db.query(Resume)
-        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
-        .first()
+        db.query(Resume).filter(Resume.id == resume_id, Resume.user_id == current_user.id).first()
     )
     if not resume:
         raise NotFoundError("Resume not found")
@@ -635,4 +621,3 @@ def get_resume_analysis_status(
         analysis_id=analysis_id,
     )
     return ResumeAnalysisStatusResponse.model_validate(analysis)
-

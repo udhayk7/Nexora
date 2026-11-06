@@ -253,14 +253,20 @@ class MatchingEngine:
                     )
                 )
                 return 75.0, positives, gaps
-            return 50.0, positives, [
-                GapSignal(
-                    type="missing",
-                    dimension="skills",
-                    title="No explicit skill tags on job listing",
-                    description="The employer did not specify structured technology requirements.",
-                )
-            ]
+            return (
+                50.0,
+                positives,
+                [
+                    GapSignal(
+                        type="missing",
+                        dimension="skills",
+                        title="No explicit skill tags on job listing",
+                        description=(
+                            "The employer did not specify structured technology requirements."
+                        ),
+                    )
+                ],
+            )
 
         matched_supported: list[str] = []
         matched_unevidenced: list[str] = []
@@ -357,8 +363,7 @@ class MatchingEngine:
         # Check candidate's evidenced domains
         candidate_domains = [d.lower() for d in (analysis.profile.domains or [])]
         user_target_roles = [
-            r.lower()
-            for r in ((preferences.target_role_families or []) if preferences else [])
+            r.lower() for r in ((preferences.target_role_families or []) if preferences else [])
         ]
 
         score = 60.0  # baseline
@@ -448,8 +453,7 @@ class MatchingEngine:
         job_seniority = (job.seniority_level or "").lower().strip()
         candidate_level = (analysis.profile.career_level_estimate or "Entry Level").lower()
         pref_seniority = [
-            s.lower()
-            for s in ((preferences.seniority_preferences or []) if preferences else [])
+            s.lower() for s in ((preferences.seniority_preferences or []) if preferences else [])
         ]
 
         if not job_seniority:
@@ -535,8 +539,7 @@ class MatchingEngine:
             for a in ((preferences.work_arrangement_preferences or []) if preferences else [])
         ]
         pref_locations = [
-            loc.lower()
-            for loc in ((preferences.preferred_locations or []) if preferences else [])
+            loc.lower() for loc in ((preferences.preferred_locations or []) if preferences else [])
         ]
 
         score = 75.0  # neutral baseline
@@ -663,7 +666,7 @@ class MatchingEngine:
 
         if not has_pref_salary:
             # Job published salary, but candidate set no minimum filter
-            s_dash = ' - ' if job.salary_min and job.salary_max else ''
+            s_dash = " - " if job.salary_min and job.salary_max else ""
             positives.append(
                 PositiveSignal(
                     dimension="compensation",
@@ -681,9 +684,7 @@ class MatchingEngine:
         assert preferences is not None
         assert preferences.min_salary is not None
 
-        user_annual_min = normalize_salary_annual(
-            preferences.min_salary, preferences.salary_period
-        )
+        user_annual_min = normalize_salary_annual(preferences.min_salary, preferences.salary_period)
         job_max = job.salary_max or job.salary_min or 0.0
         job_annual_max = normalize_salary_annual(job_max, job.salary_period)
 

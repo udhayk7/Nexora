@@ -138,10 +138,7 @@ class NotificationService:
             return None, False
         if notification_type == "job_freshness_update" and not pref.enable_job_freshness_updates:
             return None, False
-        if (
-            notification_type == "task_completion"
-            and not pref.enable_task_completion_updates
-        ):
+        if notification_type == "task_completion" and not pref.enable_task_completion_updates:
             return None, False
         if notification_type == "system" and not pref.enable_system_notifications:
             return None, False
@@ -269,12 +266,7 @@ class NotificationService:
             or 0
         )
 
-        items = (
-            query.order_by(Notification.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        items = query.order_by(Notification.created_at.desc()).offset(skip).limit(limit).all()
 
         return NotificationListResponse(
             items=[NotificationResponse.model_validate(n) for n in items],
@@ -426,9 +418,10 @@ class NotificationService:
             if not pref.enable_in_app:
                 continue
 
-            is_assessment = (
-                "assessment" in iv.interview_type
-                or iv.interview_type in ("coding_assessment", "take_home", "online_assessment")
+            is_assessment = "assessment" in iv.interview_type or iv.interview_type in (
+                "coding_assessment",
+                "take_home",
+                "online_assessment",
             )
             notif_type = "assessment_reminder" if is_assessment else "interview_reminder"
             category_enabled = (

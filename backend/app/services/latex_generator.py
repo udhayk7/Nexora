@@ -121,22 +121,26 @@ def generate_latex_resume(
 
     # Professional Summary Section
     if summary:
-        latex.extend([
-            r"\section{Professional Summary}",
-            f"{summary}\\\\",
-            r"",
-        ])
+        latex.extend(
+            [
+                r"\section{Professional Summary}",
+                f"{summary}\\\\",
+                r"",
+            ]
+        )
 
     # Technical Skills Section
     if escaped_skills:
         skills_str = ", ".join(escaped_skills)
-        latex.extend([
-            r"\section{Technical Skills}",
-            r"\begin{itemize}",
-            f"    \\item \\textbf{{Core Competencies:}} {skills_str}",
-            r"\end{itemize}",
-            r"",
-        ])
+        latex.extend(
+            [
+                r"\section{Technical Skills}",
+                r"\begin{itemize}",
+                f"    \\item \\textbf{{Core Competencies:}} {skills_str}",
+                r"\end{itemize}",
+                r"",
+            ]
+        )
 
     # Experience Section
     if experience_list:
@@ -152,10 +156,12 @@ def generate_latex_resume(
                     f"\\textbf{{{title}}} -- \\textit{{{company}}} "
                     f"\\hfill {{\\small {date_range}}}\\\\"
                 )
-                latex.extend([
-                    r"\noindent",
-                    header_line,
-                ])
+                latex.extend(
+                    [
+                        r"\noindent",
+                        header_line,
+                    ]
+                )
                 if bullets:
                     latex.append(r"\begin{itemize}")
                     for b in bullets:
@@ -163,11 +169,13 @@ def generate_latex_resume(
                     latex.append(r"\end{itemize}")
                 latex.append(r"\vspace{0.4em}")
             elif isinstance(exp, str) and exp.strip():
-                latex.extend([
-                    r"\begin{itemize}",
-                    f"    \\item {escape_latex(exp)}",
-                    r"\end{itemize}",
-                ])
+                latex.extend(
+                    [
+                        r"\begin{itemize}",
+                        f"    \\item {escape_latex(exp)}",
+                        r"\end{itemize}",
+                    ]
+                )
         latex.append("")
 
     # Projects Section
@@ -177,10 +185,12 @@ def generate_latex_resume(
             if isinstance(proj, dict):
                 p_title = escape_latex(proj.get("title") or "Project")
                 p_bullets = proj.get("bullets") or []
-                latex.extend([
-                    r"\noindent",
-                    f"\\textbf{{{p_title}}}\\\\",
-                ])
+                latex.extend(
+                    [
+                        r"\noindent",
+                        f"\\textbf{{{p_title}}}\\\\",
+                    ]
+                )
                 if p_bullets:
                     latex.append(r"\begin{itemize}")
                     for b in p_bullets:
@@ -188,11 +198,13 @@ def generate_latex_resume(
                     latex.append(r"\end{itemize}")
                 latex.append(r"\vspace{0.4em}")
             elif isinstance(proj, str) and proj.strip():
-                latex.extend([
-                    r"\begin{itemize}",
-                    f"    \\item {escape_latex(proj)}",
-                    r"\end{itemize}",
-                ])
+                latex.extend(
+                    [
+                        r"\begin{itemize}",
+                        f"    \\item {escape_latex(proj)}",
+                        r"\end{itemize}",
+                    ]
+                )
         latex.append("")
 
     # Education Section
@@ -205,10 +217,13 @@ def generate_latex_resume(
                 year = escape_latex(edu.get("year") or "")
                 details = edu.get("details") or []
 
-                latex.extend([
-                    r"\noindent",
-                    f"\\textbf{{{degree}}} -- \\textit{{{inst}}} \\hfill {{\\small {year}}}\\\\",
-                ])
+                deg_inst = f"\\textbf{{{degree}}} -- \\textit{{{inst}}}"
+                latex.extend(
+                    [
+                        r"\noindent",
+                        f"{deg_inst} \\hfill {{\\small {year}}}\\\\",
+                    ]
+                )
                 if details:
                     latex.append(r"\begin{itemize}")
                     for d in details:
@@ -216,16 +231,20 @@ def generate_latex_resume(
                     latex.append(r"\end{itemize}")
                 latex.append(r"\vspace{0.4em}")
             elif isinstance(edu, str) and edu.strip():
-                latex.extend([
-                    r"\begin{itemize}",
-                    f"    \\item {escape_latex(edu)}",
-                    r"\end{itemize}",
-                ])
+                latex.extend(
+                    [
+                        r"\begin{itemize}",
+                        f"    \\item {escape_latex(edu)}",
+                        r"\end{itemize}",
+                    ]
+                )
         latex.append("")
 
-    latex.extend([
-        r"\end{document}",
-        "",
-    ])
+    latex.extend(
+        [
+            r"\end{document}",
+            "",
+        ]
+    )
 
     return "\n".join(latex)

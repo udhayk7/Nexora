@@ -92,9 +92,7 @@ class Settings(BaseSettings):
                     "of at least 32 characters in production"
                 )
             if "change_me_in_local_env" in self.DATABASE_URL:
-                raise ValueError(
-                    "DATABASE_URL contains default placeholder password in production"
-                )
+                raise ValueError("DATABASE_URL contains default placeholder password in production")
         return self
 
     @property

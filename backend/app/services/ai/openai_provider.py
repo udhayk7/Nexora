@@ -129,4 +129,3 @@ class OpenAIProvider(AIProvider):
 
         logger.error(f"OpenAI analysis failed after retries: {last_exception}")
         raise AIProviderError(f"OpenAI analysis failed: {last_exception}") from last_exception
-

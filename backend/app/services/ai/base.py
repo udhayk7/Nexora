@@ -61,8 +61,7 @@ class AIProvider(Protocol):
     model_name: str
 
     @property
-    def is_configured(self) -> bool:
-        ...
+    def is_configured(self) -> bool: ...
 
     def analyze_resume(
         self,

@@ -118,9 +118,7 @@ def update_company(
     current_user: User = Depends(get_current_active_user),
 ) -> CompanyDetailResponse:
     """Update company metadata with authorization enforcement."""
-    return CompanyService.update_company(
-        db=db, user=current_user, company_id=company_id, data=data
-    )
+    return CompanyService.update_company(db=db, user=current_user, company_id=company_id, data=data)
 
 
 @companies_router.post(
@@ -135,9 +133,7 @@ def verify_company(
     current_user: User = Depends(get_current_active_user),
 ) -> CompanyDetailResponse:
     """Transition company verification status with mandatory evidence notes."""
-    return CompanyService.verify_company(
-        db=db, user=current_user, company_id=company_id, data=data
-    )
+    return CompanyService.verify_company(db=db, user=current_user, company_id=company_id, data=data)
 
 
 @companies_router.post(

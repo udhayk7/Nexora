@@ -115,4 +115,3 @@ class User(Base, TimestampMixin):
         uselist=False,
         cascade="all, delete-orphan",
     )
-

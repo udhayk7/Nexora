@@ -1394,3 +1394,219 @@ export const notificationsApi = {
     }),
 };
 
+// ============================================================================
+// Automated Job Discovery Interfaces & API
+// ============================================================================
+
+export interface DiscoveryOverview {
+  total_sources: number;
+  total_active_sources: number;
+  sources_scanned: number;
+  new_jobs_discovered: number;
+  updated_jobs: number;
+  failed_source_scans: number;
+  last_discovery_run: string | null;
+  supported_adapters: {
+    id: string;
+    name: string;
+    description: string;
+    example_token: string;
+    token_label: string;
+  }[];
+}
+
+export interface DiscoverySource {
+  id: string;
+  company_id: string;
+  company_name?: string | null;
+  source_name: string;
+  source_type: string;
+  adapter_name?: string | null;
+  source_url?: string | null;
+  board_token?: string | null;
+  is_enabled: boolean;
+  scan_frequency_hours: number;
+  last_successful_scan_at?: string | null;
+  last_scan_status?: string | null;
+  last_scan_message?: string | null;
+  jobs_discovered_count: number;
+  error_count: number;
+  first_seen_at: string;
+  last_checked_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoverySourceListResponse {
+  items: DiscoverySource[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface DiscoverySourceCreateInput {
+  company_id: string;
+  source_name: string;
+  source_type?: string;
+  adapter_name: string;
+  source_url?: string;
+  board_token?: string;
+  scan_frequency_hours?: number;
+  is_enabled?: boolean;
+}
+
+export interface DiscoverySourceUpdateInput {
+  source_name?: string;
+  adapter_name?: string;
+  source_url?: string;
+  board_token?: string;
+  scan_frequency_hours?: number;
+  is_enabled?: boolean;
+}
+
+export interface DiscoverySourceTestRequest {
+  adapter_name: string;
+  source_url?: string;
+  board_token?: string;
+}
+
+export interface DiscoverySourceTestResponse {
+  is_success: boolean;
+  message: string;
+  jobs_detected: number;
+  sample_jobs: {
+    title: string;
+    location?: string;
+    role_family?: string;
+    seniority?: string;
+    skills?: string[];
+    url: string;
+  }[];
+}
+
+export interface DiscoveryScanResult {
+  source_id: string;
+  company_name: string;
+  adapter_name: string;
+  status: string;
+  jobs_found: number;
+  jobs_imported: number;
+  jobs_updated: number;
+  message: string;
+  duration_seconds: number;
+}
+
+export interface DiscoveryBatchScanResult {
+  sources_scanned: number;
+  total_jobs_found: number;
+  total_jobs_imported: number;
+  total_jobs_updated: number;
+  failed_sources: number;
+  results: DiscoveryScanResult[];
+}
+
+export interface DiscoveryScanLogItem {
+  id: string;
+  company_source_id?: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+  adapter_name: string;
+  scan_type: string;
+  status: string;
+  jobs_found: number;
+  jobs_imported: number;
+  jobs_updated: number;
+  error_message?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+  duration_seconds?: number | null;
+}
+
+export interface DiscoveryScanLogListResponse {
+  items: DiscoveryScanLogItem[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export const discoveryApi = {
+  getOverview: () => apiClient<DiscoveryOverview>("/discovery/overview"),
+
+  getAdapters: () =>
+    apiClient<
+      {
+        id: string;
+        name: string;
+        description: string;
+        example_token: string;
+        token_label: string;
+      }[]
+    >("/discovery/adapters"),
+
+  listSources: (params?: {
+    company_id?: string;
+    adapter_name?: string;
+    is_enabled?: boolean;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.company_id) q.append("company_id", params.company_id);
+    if (params?.adapter_name) q.append("adapter_name", params.adapter_name);
+    if (params?.is_enabled !== undefined) q.append("is_enabled", String(params.is_enabled));
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<DiscoverySourceListResponse>(`/discovery/sources${qs ? `?${qs}` : ""}`);
+  },
+
+  createSource: (data: DiscoverySourceCreateInput) =>
+    apiClient<DiscoverySource>("/discovery/sources", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateSource: (id: string, data: DiscoverySourceUpdateInput) =>
+    apiClient<DiscoverySource>(`/discovery/sources/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteSource: (id: string) =>
+    apiClient<void>(`/discovery/sources/${id}`, {
+      method: "DELETE",
+    }),
+
+  testSource: (data: DiscoverySourceTestRequest) =>
+    apiClient<DiscoverySourceTestResponse>("/discovery/sources/test", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  scanSource: (id: string) =>
+    apiClient<DiscoveryScanResult>(`/discovery/sources/${id}/scan`, {
+      method: "POST",
+    }),
+
+  scanAll: (only_due: boolean = false) =>
+    apiClient<DiscoveryBatchScanResult>(`/discovery/sources/scan-all?only_due=${only_due}`, {
+      method: "POST",
+    }),
+
+  getLogs: (params?: {
+    source_id?: string;
+    company_id?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.source_id) q.append("source_id", params.source_id);
+    if (params?.company_id) q.append("company_id", params.company_id);
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<DiscoveryScanLogListResponse>(`/discovery/logs${qs ? `?${qs}` : ""}`);
+  },
+};
+
+

@@ -111,8 +111,7 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
         logger.warning(
-            f"Handled application error: code={exc.code} status={exc.status_code} "
-            f"msg={exc.message}"
+            f"Handled application error: code={exc.code} status={exc.status_code} msg={exc.message}"
         )
         return build_error_response(
             status_code=exc.status_code,

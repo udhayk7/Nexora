@@ -104,4 +104,3 @@ class ProcessRemindersResponse(BaseModel):
     reminders_created: int
     scanned_interviews: int = 0
     scanned_applications: int = 0
-

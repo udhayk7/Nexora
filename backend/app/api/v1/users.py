@@ -17,4 +17,3 @@ def get_me(
 ) -> UserResponse:
     """Return profile details for the authenticated user."""
     return UserResponse.model_validate(current_user)
-

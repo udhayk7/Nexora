@@ -168,18 +168,18 @@ class TailoringEngine:
 Strictly adhere to the Zero-Fabrication rule: every change must be grounded in the resume.
 
 <JOB_REQUISITION>
-Title: {job_info['title']}
-Company: {job_info['company']}
-Required Skills: {', '.join(job_info['skills'] or [])}
-Seniority: {job_info['seniority']}
+Title: {job_info["title"]}
+Company: {job_info["company"]}
+Required Skills: {", ".join(job_info["skills"] or [])}
+Seniority: {job_info["seniority"]}
 Description:
-{job_info['description']}
+{job_info["description"]}
 </JOB_REQUISITION>
 
 <PRE_ANALYZED_ALIGNMENT>
-Relevant Skills in Resume: {', '.join(analysis.relevant_skills)}
-Missing Requirements (DO NOT FABRICATE): {', '.join(analysis.missing_requirements)}
-Keyword Opportunities: {', '.join(analysis.keyword_opportunities)}
+Relevant Skills in Resume: {", ".join(analysis.relevant_skills)}
+Missing Requirements (DO NOT FABRICATE): {", ".join(analysis.missing_requirements)}
+Keyword Opportunities: {", ".join(analysis.keyword_opportunities)}
 </PRE_ANALYZED_ALIGNMENT>
 
 <RESUME_DOCUMENT>

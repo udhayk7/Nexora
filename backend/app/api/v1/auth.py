@@ -290,9 +290,7 @@ def logout(
 
     if raw_token:
         token_hash = hash_token(raw_token)
-        token_record = (
-            db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
-        )
+        token_record = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
         if token_record and token_record.revoked_at is None:
             token_record.revoked_at = datetime.now(timezone.utc)
             db.commit()

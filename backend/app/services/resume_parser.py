@@ -5,9 +5,7 @@ from typing import Any, Optional
 from app.core.logging import logger
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-PHONE_REGEX = re.compile(
-    r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
-)
+PHONE_REGEX = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}")
 URL_REGEX = re.compile(
     r"(?:https?://[^\s]+|linkedin\.com/in/[\w-]+|github\.com/[\w-]+)",
     re.IGNORECASE,
@@ -334,9 +332,7 @@ class ResumeParserService:
         education = self.parse_education(sections.get("education", []))
 
         projects = [
-            line.lstrip("•-* ").strip()
-            for line in sections.get("projects", [])
-            if line.strip()
+            line.lstrip("•-* ").strip() for line in sections.get("projects", []) if line.strip()
         ]
         certifications = [
             line.lstrip("•-* ").strip()

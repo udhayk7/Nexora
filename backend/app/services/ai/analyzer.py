@@ -69,9 +69,7 @@ class ResumeAnalysisService:
                 .first()
             )
             if existing:
-                logger.info(
-                    f"Returning cached analysis {existing.id} for version {version.id}"
-                )
+                logger.info(f"Returning cached analysis {existing.id} for version {version.id}")
                 return existing
 
         # Create persistent analysis record in processing state
@@ -134,9 +132,7 @@ class ResumeAnalysisService:
                 },
             )
 
-            logger.info(
-                f"Successfully completed AI analysis {analysis.id} for resume {resume.id}"
-            )
+            logger.info(f"Successfully completed AI analysis {analysis.id} for resume {resume.id}")
             return analysis
 
         except Exception as exc:

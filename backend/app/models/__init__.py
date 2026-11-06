@@ -8,7 +8,7 @@ from app.models.application import (
     JobApplication,
 )
 from app.models.base import Base
-from app.models.company import Company, CompanySource
+from app.models.company import Company, CompanySource, DiscoveryScanLog
 from app.models.job import Job, JobSource, JobVerification
 from app.models.match import JobMatch, UserMatchingPreference
 from app.models.notification import Notification, UserNotificationPreference
@@ -26,6 +26,7 @@ __all__ = [
     "ResumeAnalysis",
     "Company",
     "CompanySource",
+    "DiscoveryScanLog",
     "Job",
     "JobSource",
     "JobVerification",

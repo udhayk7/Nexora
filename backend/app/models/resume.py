@@ -184,4 +184,3 @@ class ResumeVersion(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("resume_id", "version_number", name="uq_resume_version_number"),
     )
-
