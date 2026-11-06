@@ -31,6 +31,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Tag,
   Trash2,
   Users,
@@ -1006,6 +1007,15 @@ export default function JobsPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/dashboard/resumes/tailor?jobId=${job.id}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-indigo-950/70 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900 transition"
+                        title="Tailor your resume for this requisition"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-400" />
+                        Tailor
+                      </Link>
+
                       <button
                         onClick={() => {
                           setVerifyJobId(job.id);

@@ -5,6 +5,7 @@ from app.api.v1.companies import companies_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.matches import matches_router
 from app.api.v1.resumes import resumes_router
+from app.api.v1.tailoring import tailoring_router
 from app.api.v1.users import users_router
 from app.core.config import settings
 from app.schemas.health import HealthResponse
@@ -29,3 +30,4 @@ api_router.include_router(resumes_router)
 api_router.include_router(companies_router)
 api_router.include_router(jobs_router)
 api_router.include_router(matches_router)
+api_router.include_router(tailoring_router)

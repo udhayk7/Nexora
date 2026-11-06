@@ -400,12 +400,21 @@ export default function ResumeStudioPage() {
           </div>
         </div>
 
-        <button
-          onClick={openNewResumeUpload}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Upload Resume
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/resumes/tailor"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-indigo-950/70 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900 font-medium text-sm transition-colors shadow-sm"
+          >
+            <Sparkles className="w-4 h-4 text-indigo-400" /> Tailor Studio
+          </Link>
+
+          <button
+            onClick={openNewResumeUpload}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Upload Resume
+          </button>
+        </div>
       </div>
 
       {/* Global Error Banner */}
@@ -514,6 +523,14 @@ export default function ResumeStudioPage() {
                       </span>
 
                       <div className="flex items-center gap-1">
+                        <Link
+                          href={`/dashboard/resumes/tailor?resumeId=${item.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Tailor this resume for a job requisition"
+                          className="p-1 hover:text-indigo-400 rounded transition-colors text-indigo-400/80"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </Link>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

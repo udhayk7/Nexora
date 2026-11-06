@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.resume import Resume
+    from app.models.tailoring import ResumeTailoringSession
     from app.models.token import RefreshToken
 
 
@@ -88,6 +89,11 @@ class User(Base, TimestampMixin):
     )
     job_matches: Mapped[list["JobMatch"]] = relationship(
         "JobMatch",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    tailoring_sessions: Mapped[list["ResumeTailoringSession"]] = relationship(
+        "ResumeTailoringSession",
         back_populates="user",
         cascade="all, delete-orphan",
     )

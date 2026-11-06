@@ -215,3 +215,4 @@ class JobMatch(Base, TimestampMixin):
     analysis: Mapped["ResumeAnalysis"] = relationship(
         "ResumeAnalysis",
     )
+

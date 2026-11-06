@@ -249,6 +249,31 @@ All API errors return a uniform, predictable JSON shape:
 - **Audit Logging**:
   - Emits `match.generated`, `match.preferences_updated`, `match.saved`, and `match.dismissed`.
 
+### 14. Resume Tailoring Studio Architecture (`backend/app/models/tailoring.py`, `services/tailoring_*.py`, `services/latex_*.py`, `frontend/src/app/dashboard/resumes/tailor/`)
+- **Zero-Fabrication & Factual Integrity Standard**:
+  - Nexora strictly enforces zero-fabrication: the system never invents technologies, programming languages, metrics, achievements, companies, dates, or degrees.
+  - Every proposed modification is classified into legitimate refinement types (`wording_improvement`, `restructuring`, `relevance_improvement`, `keyword_alignment`) and must cite verbatim supporting evidence from the candidate's existing resume (`supporting_evidence: {"section": "...", "excerpt": "..."}`).
+  - Job requirements not evidenced in the candidate's resume are categorized under `missing_requirements` and strictly omitted from tailored resume content.
+- **Tailoring Workspace Data Model**:
+  - `resume_tailoring_sessions`: Scoped to `user_id`, `resume_id`, `version_id` (base version), and `job_id`. Tracks active LaTeX source, grounded job requirement analysis, provider/model, and status (`ready`, `saved`).
+  - `resume_tailoring_changes`: Individual structured proposed modifications linked to the session. Tracks `original_content`, `proposed_content`, `user_content`, `status` (`pending`, `accepted`, `rejected`, `modified`), `order_index`, and citation evidence.
+  - `resume_versions` extension: Extends version records with `parent_version_id`, `job_id`, `tailoring_session_id`, `is_tailored`, `latex_source`, and `tailoring_metadata`. Original parent resume versions remain strictly immutable.
+- **AI Tailoring Engine & Multi-Provider Abstraction (`backend/app/services/tailoring_engine.py`)**:
+  - Pluggable provider architecture supporting configured Gemini and OpenAI endpoints with temperature controls ($T=0.2$) and strict injection defense.
+  - Deterministic Grounded Engine fallback (`v1.0`): Guarantees high-quality, truthful improvements for professional summaries, prioritized skill groupings, and action-oriented bullet enhancements without external API dependencies.
+- **Sandboxed LaTeX Compilation & Layout Renderer (`backend/app/services/latex_compiler.py`)**:
+  - **Sandbox Security Guard**: Token-level scanner rejects dangerous command execution directives (`\write18`, `\sys_exec`, `\input`, `\include`, `\openin`, `\openout`, `\newwrite`, `\directlua`, etc.) with HTTP 400.
+  - **Execution Isolation**: When `pdflatex` is available, runs in an isolated temporary directory with `-no-shell-escape` and timeout limits.
+  - **High-Fidelity ReportLab Fallback**: Minimal Docker containers compile standard A4 resumes directly using ReportLab, guaranteeing 100% sandboxed execution, zero shell invocation, and instant PDF rendering.
+- **Frontend 3-Panel Tailoring Workspace (`frontend/src/app/dashboard/resumes/tailor/`)**:
+  - **Left Panel (Job & Alignment)**: Target requisition details, matching skills badges, missing qualification alerts, and truthful terminology opportunities.
+  - **Center Panel (Editor & Review)**:
+    - Tab 1: AI Suggestion Review with original vs proposed diffs, evidence citations, individual approve/reject/edit controls, and batch actions.
+    - Tab 2: Monaco Code Editor (`@monaco-editor/react`) with LaTeX syntax highlighting, line numbers, search/replace, unsaved changes indicator, and save/revert controls.
+  - **Right Panel (Live PDF Preview & Export)**: Sandboxed PDF preview iframe, recompile button, native PDF and `.tex` source downloads, and modal to commit the tailored resume as an immutable `ResumeVersion`.
+- **Audit Logging**:
+  - Emits `tailoring.session_created`, `tailoring.change_status_updated`, `tailoring.batch_changes_updated`, `tailoring.latex_updated`, and `tailoring.version_saved`.
+
 ---
 
 ## Token & Cookie Security Strategy

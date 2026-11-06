@@ -662,6 +662,108 @@ export interface JobMatchStateUpdate {
   is_dismissed?: boolean;
 }
 
+// ==========================================
+// Resume Tailoring Studio Interfaces
+// ==========================================
+
+export interface SupportingEvidence {
+  section: string;
+  excerpt: string;
+}
+
+export interface JobRequirementAnalysis {
+  relevant_skills: string[];
+  relevant_experience: string[];
+  missing_requirements: string[];
+  keyword_opportunities: string[];
+  improvement_opportunities: string[];
+  summary_notes?: string | null;
+}
+
+export interface TailoringChange {
+  id: string;
+  session_id: string;
+  section_name: string;
+  change_type: string;
+  original_content: string;
+  proposed_content: string;
+  user_content?: string | null;
+  active_content: string;
+  reason: string;
+  supporting_evidence?: SupportingEvidence | null;
+  related_job_requirement: string;
+  confidence_level: string;
+  status: "pending" | "accepted" | "rejected" | "modified";
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TailoringSession {
+  id: string;
+  user_id: string;
+  resume_id: string;
+  version_id: string;
+  job_id: string;
+  status: string;
+  job_analysis?: JobRequirementAnalysis | null;
+  latex_content?: string | null;
+  tailored_version_id?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  error_summary?: string | null;
+  changes: TailoringChange[];
+  job?: Job | null;
+  resume_title?: string | null;
+  parent_version_number?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TailoringSessionSummary {
+  id: string;
+  resume_id: string;
+  version_id: string;
+  job_id: string;
+  status: string;
+  job_title: string;
+  company_name: string;
+  resume_title: string;
+  tailored_version_id?: string | null;
+  total_changes: number;
+  accepted_changes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompilePDFResponse {
+  success: boolean;
+  compilation_engine: string;
+  download_url?: string | null;
+  error_log?: string | null;
+  page_count: number;
+  disclaimer: string;
+}
+
+export interface TailoredVersionResponse {
+  id: string;
+  resume_id: string;
+  version_number: number;
+  parent_version_id?: string | null;
+  job_id?: string | null;
+  tailoring_session_id?: string | null;
+  is_tailored: boolean;
+  title?: string | null;
+  original_filename: string;
+  file_type: string;
+  file_size: number;
+  parsing_status: string;
+  latex_source?: string | null;
+  pdf_storage_path?: string | null;
+  tailoring_metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface JobMatchFilterParams {
   role_family?: string;
   location?: string;
@@ -744,6 +846,86 @@ export const matchingApi = {
     apiClient<JobMatch>(`/matches/${matchId}`, {
       method: "PATCH",
       body: JSON.stringify(state),
+    }),
+};
+
+export async function fetchBlob(endpoint: string): Promise<Blob> {
+  const url = `${API_BASE}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const headers = new Headers();
+  if (memoryAccessToken) {
+    headers.set("Authorization", `Bearer ${memoryAccessToken}`);
+  }
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file: ${response.statusText}`);
+  }
+
+  return response.blob();
+}
+
+export const tailoringApi = {
+  createSession: (data: { resume_id: string; version_id?: string; job_id: string }) =>
+    apiClient<TailoringSession>("/tailoring/sessions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listSessions: (skip = 0, limit = 50) =>
+    apiClient<TailoringSessionSummary[]>(`/tailoring/sessions?skip=${skip}&limit=${limit}`),
+
+  getSession: (sessionId: string) =>
+    apiClient<TailoringSession>(`/tailoring/sessions/${sessionId}`),
+
+  updateChangeStatus: (
+    sessionId: string,
+    changeId: string,
+    data: { status: "pending" | "accepted" | "rejected" | "modified"; user_content?: string }
+  ) =>
+    apiClient<TailoringSession>(`/tailoring/sessions/${sessionId}/changes/${changeId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  batchUpdateChanges: (
+    sessionId: string,
+    action: "accept_all" | "reject_all" | "restore_original"
+  ) =>
+    apiClient<TailoringSession>(`/tailoring/sessions/${sessionId}/batch`, {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    }),
+
+  updateContent: (sessionId: string, latexContent: string) =>
+    apiClient<TailoringSession>(`/tailoring/sessions/${sessionId}/content`, {
+      method: "PUT",
+      body: JSON.stringify({ latex_content: latexContent }),
+    }),
+
+  compilePdf: (sessionId: string, latexContent?: string) =>
+    apiClient<CompilePDFResponse>(`/tailoring/sessions/${sessionId}/compile`, {
+      method: "POST",
+      body: JSON.stringify({ latex_content: latexContent }),
+    }),
+
+  downloadPdf: (sessionId: string, filename = "tailored_resume.pdf") =>
+    downloadFile(`/tailoring/sessions/${sessionId}/pdf`, filename),
+
+  downloadLatex: (sessionId: string, filename = "tailored_resume.tex") =>
+    downloadFile(`/tailoring/sessions/${sessionId}/latex`, filename),
+
+  saveTailoredVersion: (
+    sessionId: string,
+    data: { title?: string; latex_content?: string }
+  ) =>
+    apiClient<TailoredVersionResponse>(`/tailoring/sessions/${sessionId}/save`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 };
 

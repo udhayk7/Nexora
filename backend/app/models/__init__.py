@@ -6,6 +6,7 @@ from app.models.company import Company, CompanySource
 from app.models.job import Job, JobSource, JobVerification
 from app.models.match import JobMatch, UserMatchingPreference
 from app.models.resume import Resume, ResumeVersion
+from app.models.tailoring import ResumeTailoringChange, ResumeTailoringSession
 from app.models.token import RefreshToken
 from app.models.user import User
 
@@ -23,4 +24,6 @@ __all__ = [
     "JobVerification",
     "UserMatchingPreference",
     "JobMatch",
+    "ResumeTailoringSession",
+    "ResumeTailoringChange",
 ]

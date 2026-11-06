@@ -908,6 +908,17 @@ export default function MatchesPage() {
                       Why this matches <ArrowRight className="w-3.5 h-3.5" />
                     </button>
 
+                    {job ? (
+                      <Link
+                        href={`/dashboard/resumes/tailor?jobId=${job.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-950/70 text-indigo-300 border border-indigo-800/50 hover:bg-indigo-900 transition"
+                        title="Tailor your resume for this opportunity"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        Tailor Resume
+                      </Link>
+                    ) : null}
+
                     {job?.application_url || job?.job_url ? (
                       <a
                         href={job.application_url || job.job_url}
@@ -1102,6 +1113,15 @@ export default function MatchesPage() {
               >
                 Close
               </button>
+              {detailMatch.job && (
+                <Link
+                  href={`/dashboard/resumes/tailor?jobId=${detailMatch.job.id}`}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Tailor Resume for Role
+                </Link>
+              )}
               {detailMatch.job?.application_url || detailMatch.job?.job_url ? (
                 <a
                   href={detailMatch.job.application_url || detailMatch.job.job_url}

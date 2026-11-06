@@ -205,7 +205,7 @@ class MatchingService:
 
         for job in jobs:
             freshness = compute_job_freshness(job.last_verified_at or job.first_seen_at)
-            setattr(job, "freshness", freshness)
+            job.freshness = freshness  # type: ignore[attr-defined]
             score, breakdown, positives, gaps = MatchingEngine.evaluate_match(
                 job=job,
                 resume_analysis=resume_analysis_result,
