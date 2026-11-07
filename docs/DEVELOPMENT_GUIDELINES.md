@@ -127,6 +127,15 @@ def protected_view(current_user: User = Depends(get_current_active_user)):
 
 ---
 
+### Final Security, Testing & Production Readiness Guidelines
+- **Universal Multi-Tenant Isolation**: Every database query accessing user data MUST filter strictly by `user_id == current_user.id`. Never assume an ID parameter belongs to the requester.
+- **Strict Consequential Action Gates**: Consequential actions (such as sending emails, submitting applications, or modifying shared state) require explicit confirmation gates (`confirm_send=True`, portal confirmation, etc.).
+- **Security Headers Everywhere**: Baseline defense-in-depth headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection`, `Referrer-Policy`, HSTS) must be preserved across API and frontend layers.
+- **Zero Suppression of Failing Tests**: Never skip, mock out, or suppress failing tests to pass CI. Fix root causes or adjust test assertions to accurately reflect domain invariants.
+- **Sanitized Logging**: Request IDs must be traced through `Request-ID` headers and log contexts. Sensitive headers (Authorization, Cookie, API keys) must never be logged.
+
+---
+
 ## Git & Version Control Practices
 
 - Commit messages should be descriptive and conventional (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`).

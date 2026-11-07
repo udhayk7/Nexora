@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.config import settings
 from app.core.logging import get_request_id, logger, set_request_id
 
 REQUEST_ID_REGEX = re.compile(r"^[a-zA-Z0-9_\-\.]{1,64}$")
@@ -40,6 +41,17 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         duration_ms = (time.perf_counter() - start_time) * 1000
         response.headers["X-Request-ID"] = get_request_id()
+
+        # Enforce baseline HTTP security headers on all responses
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), camera=(), microphone=(), payment=()"
+        )
+        if getattr(settings, "ENVIRONMENT", "development") == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         logger.info(
             f"Finished {request.method} {request.url.path} "

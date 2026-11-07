@@ -504,7 +504,11 @@ class RecommendationService:
 
         # Projects from resume version
         parsed = resume_version.parsed_content or {}
-        proj_list = [p.get("title") for p in parsed.get("projects", []) if p.get("title")]
+        proj_list = [
+            p if isinstance(p, str) else p.get("title")
+            for p in parsed.get("projects", [])
+            if isinstance(p, str) or (isinstance(p, dict) and p.get("title"))
+        ]
 
         why_matches = {
             "skills": matching_skills[:4] or ["Core technical alignment with job requirements"],

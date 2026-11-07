@@ -1140,6 +1140,32 @@ Every LLM call is tracked, audited, and constrained server-side:
 ### 28.5 SaaS Health Dashboard (`/dashboard/integrations`)
 A unified Next.js dashboard providing administrators and candidates with real-time operational transparency, interactive diagnostic ping buttons, budget consumption progress gauges, token breakdown charts, and recent audit logs.
 
+---
+
+## 29. Production Readiness & Security Architecture (Prompt 25)
+
+### 29.1 Security Headers & Middleware Defenses
+Nexora implements defense-in-depth security headers at both the FastAPI API layer (`app/core/middleware.py`) and the Next.js frontend proxy (`frontend/next.config.mjs`):
+- `X-Content-Type-Options: nosniff` (prevents MIME-type sniffing attacks)
+- `X-Frame-Options: DENY` (clickjacking mitigation)
+- `X-XSS-Protection: 1; mode=block` (legacy browser reflective XSS filter)
+- `Referrer-Policy: strict-origin-when-cross-origin` (protects sensitive path tokens from third-party leakage)
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()` (restricts browser device APIs)
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (enforced when `ENVIRONMENT=production`)
+
+### 29.2 Multi-Tenant Isolation & IDOR Protection
+- Universal scoping: All database models tie back to `user_id`. Queries consistently enforce `filter(Model.user_id == current_user.id)`.
+- Copilot session isolation: `OrchestratorService.process_message` validates ownership before dispatching agent workflows. Unowned sessions raise `NotFoundError(404)`.
+- Public portfolio gate: `/portfolio/[public_slug]` validates `is_published == True`. Draft or revoked portfolios return 404, preventing draft or unpublished profile exposure.
+
+### 29.3 Comprehensive Automated Quality Architecture
+- 347 automated tests covering full unit, integration, multi-user isolation, security hardening, and end-to-end workflows A through H.
+- Static typing: Mypy (169 source files, 0 errors) and TypeScript `tsc --noEmit` (0 errors).
+- Zero ESLint warnings across all 27 Next.js routes.
+- Ruff linter and formatter applied to 203 files.
+- Single unbroken Alembic migration history ending at head `f6764b34df63`. Verified disaster recovery via SQL backup and restoration test.
+
+
 
 
 

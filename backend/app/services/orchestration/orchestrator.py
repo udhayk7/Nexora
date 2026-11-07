@@ -204,7 +204,13 @@ class AIOrchestrator:
         workflow_id = f"wf_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
 
-        sess = cls.get_or_create_session(db, user, session_id=session_id)
+        sess = (
+            db.query(CopilotSession)
+            .filter(CopilotSession.id == session_id, CopilotSession.user_id == user.id)
+            .first()
+        )
+        if not sess:
+            raise NotFoundError(f"Copilot session {session_id} not found.")
 
         # 1. Record User Message
         user_msg = CopilotMessage(

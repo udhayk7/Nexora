@@ -49,3 +49,13 @@ def test_sanitize_data_redacts_sensitive_keys() -> None:
     assert cleaned["nested"]["normal"] == "value"
     assert cleaned["items"][0]["access_token"] == "[REDACTED]"
     assert cleaned["items"][1]["item_name"] == "resume.pdf"
+
+
+def test_security_headers_present_on_all_responses(client: TestClient) -> None:
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.headers.get("X-Content-Type-Options") == "nosniff"
+    assert response.headers.get("X-Frame-Options") == "DENY"
+    assert response.headers.get("X-XSS-Protection") == "1; mode=block"
+    assert response.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+    assert "geolocation=()" in response.headers.get("Permissions-Policy", "")
