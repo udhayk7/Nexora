@@ -1,8 +1,11 @@
 """Unit and integration tests for Company Intelligence & Research module."""
 
+import threading
+import time
 import uuid
 from datetime import datetime
 from unittest.mock import patch
+from urllib.robotparser import RobotFileParser
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +33,7 @@ from app.services.company_intelligence.adapters import (
     RSSFeedAdapter,
     SimpleHTMLTextExtractor,
     SSRFSafeFetcher,
+    extract_crawl_delay_directive,
     is_official_domain,
     sanitize_untrusted_content,
 )
@@ -42,8 +46,10 @@ from app.services.company_intelligence_service import CompanyIntelligenceService
 
 @pytest.fixture(autouse=True)
 def mock_web_adapter(request):
+    RobotsPolicyEnforcer.reset_shared_state()
     if request.node.get_closest_marker("no_mock_web"):
         yield
+        RobotsPolicyEnforcer.reset_shared_state()
         return
     payload1 = ResearchSourcePayload(
         source_type="official_website",
@@ -61,6 +67,7 @@ def mock_web_adapter(request):
         return_value=[payload1],
     ):
         yield
+    RobotsPolicyEnforcer.reset_shared_state()
 
 
 def create_user_and_auth(
@@ -1098,19 +1105,189 @@ def test_complete_multi_user_authorization_isolation(client: TestClient, db_sess
 # ============================================================================
 
 
-def test_crawl_rate_limiter_delay():
+def test_crawl_delay_no_directive():
+    RobotsPolicyEnforcer.reset_shared_state()
     enforcer = RobotsPolicyEnforcer()
-    target_url = "https://example.com/careers"
+    robots_txt = "User-agent: *\nDisallow: /admin\n"
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    assert cd is None
+    RobotsPolicyEnforcer._shared_cache["https://example-nodir.com"] = (
+        rp,
+        "parsed",
+        time.time(),
+        None,
+    )
+
+    delay = enforcer.get_crawl_delay("https://example-nodir.com/about")
+    assert delay == enforcer.default_crawl_delay  # 0.5s
 
     with patch("time.sleep") as mock_sleep:
-        # First call establishes timestamp, no sleep needed
-        enforcer.apply_rate_limit(target_url)
+        enforcer.apply_rate_limit("https://example-nodir.com/about")
+        mock_sleep.assert_not_called()
+        enforcer.apply_rate_limit("https://example-nodir.com/careers")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 2) == 0.5
+
+
+def test_crawl_delay_1_second_directive():
+    RobotsPolicyEnforcer.reset_shared_state()
+    enforcer = RobotsPolicyEnforcer()
+    robots_txt = "User-agent: NexoraBot\nCrawl-delay: 1\nDisallow: /admin\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    assert cd == "1"
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache["https://example-1s.com"] = (rp, "parsed", time.time(), cd)
+
+    delay = enforcer.get_crawl_delay("https://example-1s.com/about")
+    assert delay == 1.0
+
+    with patch("time.sleep") as mock_sleep:
+        enforcer.apply_rate_limit("https://example-1s.com/about")
+        mock_sleep.assert_not_called()
+        enforcer.apply_rate_limit("https://example-1s.com/careers")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 1.0
+
+
+def test_crawl_delay_5_second_directive():
+    RobotsPolicyEnforcer.reset_shared_state()
+    enforcer = RobotsPolicyEnforcer()
+    robots_txt = "User-agent: *\nCrawl-delay: 5\nDisallow: /private\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    assert cd == "5"
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache["https://example-5s.com"] = (rp, "parsed", time.time(), cd)
+
+    delay = enforcer.get_crawl_delay("https://example-5s.com/about")
+    assert delay == 5.0  # Full 5 seconds, never capped to 2.0s
+
+    with patch("time.sleep") as mock_sleep:
+        enforcer.apply_rate_limit("https://example-5s.com/about")
+        mock_sleep.assert_not_called()
+        enforcer.apply_rate_limit("https://example-5s.com/careers")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 5.0
+
+
+def test_crawl_delay_longer_valid_directive():
+    RobotsPolicyEnforcer.reset_shared_state()
+    enforcer = RobotsPolicyEnforcer()
+    robots_txt = "User-agent: NexoraBot\nCrawl-delay: 15\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    assert cd == "15"
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache["https://example-15s.com"] = (rp, "parsed", time.time(), cd)
+
+    delay = enforcer.get_crawl_delay("https://example-15s.com/about")
+    assert delay == 15.0  # Full longer valid directive respected without capping
+
+    with patch("time.sleep") as mock_sleep:
+        enforcer.apply_rate_limit("https://example-15s.com/about")
+        mock_sleep.assert_not_called()
+        enforcer.apply_rate_limit("https://example-15s.com/jobs")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 15.0
+
+
+def test_crawl_delay_invalid_negative_and_unreasonable_values():
+    RobotsPolicyEnforcer.reset_shared_state()
+    enforcer = RobotsPolicyEnforcer()
+
+    # Negative value: preserved minimum pacing, never disabled
+    RobotsPolicyEnforcer._shared_cache["https://neg.com"] = (None, "parsed", time.time(), "-5")
+    assert enforcer.get_crawl_delay("https://neg.com/test") == 0.5
+
+    # Zero value: preserved minimum pacing, never disabled
+    RobotsPolicyEnforcer._shared_cache["https://zero.com"] = (None, "parsed", time.time(), "0")
+    assert enforcer.get_crawl_delay("https://zero.com/test") == 0.5
+
+    # Malformed / non-numeric string: safe fallback
+    RobotsPolicyEnforcer._shared_cache["https://bad.com"] = (
+        None,
+        "parsed",
+        time.time(),
+        "not_a_number",
+    )
+    assert enforcer.get_crawl_delay("https://bad.com/test") == 0.5
+
+    # Unreasonable astronomical value: clamped to max_crawl_delay (60.0s) to avoid worker hanging
+    RobotsPolicyEnforcer._shared_cache["https://unreasonable.com"] = (
+        None,
+        "parsed",
+        time.time(),
+        "86400",
+    )
+    assert enforcer.get_crawl_delay("https://unreasonable.com/test") == 60.0
+
+
+def test_multiple_adapters_share_domain_pacing():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://shared-adapter.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 4\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    # Instantiate separate adapters each with independent fetcher instances
+    web_adapter = OfficialWebsiteAdapter(fetcher=SSRFSafeFetcher())
+    blog_adapter = EngineeringBlogAdapter(fetcher=SSRFSafeFetcher())
+    news_adapter = CompanyNewsroomAdapter(fetcher=SSRFSafeFetcher())
+
+    with patch("time.sleep") as mock_sleep:
+        # Adapter 1 initiates first request
+        web_adapter.fetcher.robots_enforcer.apply_rate_limit(f"{target_domain}/about")
         mock_sleep.assert_not_called()
 
-        # Immediate second call for same domain triggers delay
-        enforcer.apply_rate_limit(target_url)
+        # Adapter 2 requests same domain - must pace against Adapter 1
+        blog_adapter.fetcher.robots_enforcer.apply_rate_limit(f"{target_domain}/blog")
         assert mock_sleep.called
-        assert mock_sleep.call_args[0][0] > 0.0
+        assert round(mock_sleep.call_args[0][0], 1) == 4.0
+
+        # Adapter 3 requests same domain - must pace against Adapter 2
+        news_adapter.fetcher.robots_enforcer.apply_rate_limit(f"{target_domain}/news")
+        assert mock_sleep.call_count == 2
+        assert round(mock_sleep.call_args[0][0], 1) == 8.0
+
+
+def test_concurrent_requests_respect_domain_pacing():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://concurrent-test.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 2\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+    sleep_calls: list[float] = []
+    lock = threading.Lock()
+
+    def mock_sleep_handler(secs: float):
+        with lock:
+            sleep_calls.append(round(secs, 1))
+
+    # Launch 4 concurrent threads hitting the same domain at the exact same moment
+    def worker(path: str):
+        with patch("time.sleep", side_effect=mock_sleep_handler):
+            enforcer.apply_rate_limit(f"{target_domain}/{path}")
+
+    threads = [threading.Thread(target=worker, args=(f"p{i}",)) for i in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # The 4 threads must receive non-overlapping staggered slots: 0.0s, 2.0s, 4.0s, 6.0s
+    assert len(sleep_calls) == 3
+    assert sorted(sleep_calls) == [2.0, 4.0, 6.0]
 
 
 def test_oversized_and_malformed_source_handling():

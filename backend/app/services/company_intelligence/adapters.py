@@ -8,7 +8,9 @@ and classifies domain provenance and verification integrity.
 import hashlib
 import json
 import logging
+import math
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -164,34 +166,156 @@ _ANTI_BOT_MARKERS = [
 ]
 
 
+def extract_crawl_delay_directive(robots_text: str, target_ua: str = "NexoraBot") -> Optional[str]:
+    """Parse Crawl-delay directive for the specified user-agent or wildcard from robots.txt."""
+    if not robots_text:
+        return None
+
+    current_uas: list[str] = []
+    ua_delays: dict[str, str] = {}
+    in_ua_block = False
+
+    for raw_line in robots_text.splitlines():
+        line = raw_line.split("#")[0].strip()
+        if not line:
+            in_ua_block = False
+            continue
+        if ":" not in line:
+            continue
+        key, val = [p.strip() for p in line.split(":", 1)]
+        k_lower = key.lower()
+        if k_lower == "user-agent":
+            if not in_ua_block:
+                current_uas = []
+                in_ua_block = True
+            current_uas.append(val.lower())
+        else:
+            in_ua_block = False
+            if k_lower == "crawl-delay" and val:
+                for ua in current_uas:
+                    if ua not in ua_delays:
+                        ua_delays[ua] = val
+
+    t_lower = target_ua.lower()
+    if t_lower in ua_delays:
+        return ua_delays[t_lower]
+    if "*" in ua_delays:
+        return ua_delays["*"]
+    return None
+
+
 class RobotsPolicyEnforcer:
     """Retrieves, parses, caches robots.txt policies, and enforces domain crawl rules.
 
     Invariants enforced:
     1. Retrieves and parses /robots.txt for each domain prior to crawling.
     2. Respects user-agent directives (NexoraBot, fallback to *).
-    3. Caches robots.txt results for 1 hour to prevent redundant requests.
+    3. Caches robots.txt results across all adapters to prevent redundant fetches.
     4. If robots.txt cannot be retrieved or policy cannot be safely established
        (e.g., 401/403/5xx or network failure), crawling that domain is DISALLOWED.
        HTTP 404 indicates no restrictions per standard conventions.
-    5. Enforces domain-level crawl rate limits and respects crawl-delay directives.
+    5. Enforces domain-level request pacing respecting full Crawl-delay directives (never capped
+       below the site's valid directive) with thread-safe atomic reservation preventing
+       concurrency races across all adapters sharing the domain.
     6. Does not bypass anti-bot, paywalls, or CAPTCHA protections.
     """
+
+    _shared_lock = threading.Lock()
+    _shared_cache: dict[str, tuple[Any, ...]] = {}
+    _domain_next_allowed_time: dict[str, float] = {}
+    _domain_last_request_time: dict[str, float] = {}
 
     def __init__(
         self,
         cache_ttl_seconds: float = 3600.0,
         default_crawl_delay: float = 0.5,
+        max_crawl_delay: float = 60.0,
     ) -> None:
         self.cache_ttl = cache_ttl_seconds
         self.default_crawl_delay = default_crawl_delay
+        self.max_crawl_delay = max_crawl_delay
         self.user_agent = "NexoraBot"
-        self._cache: dict[str, tuple[Optional[RobotFileParser], str, float]] = {}
-        self._last_request_time: dict[str, float] = {}
+
+    @property
+    def _cache(self) -> dict[str, tuple[Any, ...]]:
+        return self._shared_cache
+
+    @_cache.setter
+    def _cache(self, val: dict[str, tuple[Any, ...]]) -> None:
+        with self._shared_lock:
+            self._shared_cache.clear()
+            self._shared_cache.update(val)
+
+    @property
+    def _last_request_time(self) -> dict[str, float]:
+        return self._domain_last_request_time
+
+    @classmethod
+    def reset_shared_state(cls) -> None:
+        """Clear cached robots policies and pacing schedules across all adapters."""
+        with cls._shared_lock:
+            cls._shared_cache.clear()
+            cls._domain_next_allowed_time.clear()
+            cls._domain_last_request_time.clear()
+
+    def reset(self) -> None:
+        """Reset state for this enforcer and shared registry."""
+        self.reset_shared_state()
 
     def get_domain_key(self, url: str) -> str:
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}".lower()
+
+    def get_crawl_delay(self, url: str) -> float:
+        """Extract and validate the domain's Crawl-delay directive.
+
+        Returns:
+            - Site's full valid Crawl-delay (never capped below valid duration).
+            - default_crawl_delay (0.5s) if omitted, negative, zero, or malformed.
+            - max_crawl_delay (60.0s) if unreasonable (> 60s) to prevent uncontrolled worker delay.
+        """
+        domain_key = self.get_domain_key(url)
+        if not domain_key:
+            return self.default_crawl_delay
+
+        with self._shared_lock:
+            cached = self._shared_cache.get(domain_key)
+
+        if not cached:
+            return self.default_crawl_delay
+
+        raw_val: Optional[Any] = None
+        if len(cached) >= 4 and cached[3] is not None:
+            raw_val = cached[3]
+        elif cached[0] is not None:
+            try:
+                raw_val = cached[0].crawl_delay(self.user_agent)
+                if raw_val is None:
+                    raw_val = cached[0].crawl_delay("*")
+            except Exception:
+                raw_val = None
+
+        if raw_val is None:
+            return self.default_crawl_delay
+
+        try:
+            parsed_cd = float(raw_val)
+            if math.isnan(parsed_cd) or math.isinf(parsed_cd):
+                return self.default_crawl_delay
+            if parsed_cd <= 0.0:
+                # Malformed or negative values must not disable pacing
+                return self.default_crawl_delay
+            if parsed_cd > self.max_crawl_delay:
+                logger.warning(
+                    "Crawl-delay %.2f for domain %s exceeds safety ceiling (%.2f); clamping",
+                    parsed_cd,
+                    domain_key,
+                    self.max_crawl_delay,
+                )
+                return self.max_crawl_delay
+            return parsed_cd
+        except (ValueError, TypeError):
+            return self.default_crawl_delay
 
     def can_crawl(
         self,
@@ -202,83 +326,93 @@ class RobotsPolicyEnforcer:
         if not domain_key:
             return False, "invalid_domain"
 
+        with self._shared_lock:
+            cached = self._shared_cache.get(domain_key)
+            now = time.time()
+            if cached and (now - cached[2]) <= self.cache_ttl:
+                parser, status = cached[0], cached[1]
+                if status == "robots_fetch_failed":
+                    return False, "robots_fetch_failed: policy cannot be safely established"
+                if status == "allow_all_404" or parser is None:
+                    return True, "allow_all_404"
+                allowed = parser.can_fetch(self.user_agent, url)
+                if not allowed:
+                    logger.info(
+                        "URL %s disallowed by robots.txt for user-agent %s", url, self.user_agent
+                    )
+                    return False, f"disallowed_by_robots_txt: path blocked for {self.user_agent}"
+                return True, "allowed_by_robots_txt"
+
+        robots_url = urljoin(domain_key, "/robots.txt")
+        res = fetcher.fetch_raw_internal(robots_url)
         now = time.time()
-        cached = self._cache.get(domain_key)
 
-        if not cached or (now - cached[2]) > self.cache_ttl:
-            robots_url = urljoin(domain_key, "/robots.txt")
-            res = fetcher.fetch_raw_internal(robots_url)
-
-            if res is None or res.status_code in (401, 403) or res.status_code >= 500:
-                reason = (
-                    f"robots_fetch_failed: HTTP {res.status_code}"
-                    if res
-                    else "robots_fetch_failed: network_error_or_timeout"
-                )
-                self._cache[domain_key] = (None, "robots_fetch_failed", now)
-                logger.warning(
-                    "robots.txt for %s could not be retrieved (%s). Crawling disallowed.",
-                    domain_key,
-                    reason,
-                )
-                return False, reason
-            elif res.status_code == 404:
-                # Standard convention: 404 means no crawl restrictions
-                self._cache[domain_key] = (None, "allow_all_404", now)
-                cached = self._cache[domain_key]
-            elif res.status_code == 200:
-                try:
-                    robots_text = res.content_bytes.decode("utf-8", errors="replace")
-                    rp = RobotFileParser()
-                    rp.parse(robots_text.splitlines())
-                    self._cache[domain_key] = (rp, "parsed", now)
-                    cached = self._cache[domain_key]
-                except Exception as exc:
-                    self._cache[domain_key] = (None, "robots_parse_failed", now)
-                    return False, f"robots_parse_failed: {exc}"
-            else:
-                self._cache[domain_key] = (None, "robots_fetch_failed", now)
-                return False, f"robots_fetch_failed: HTTP {res.status_code}"
-
-        parser, status, _ = self._cache[domain_key]
-        if status == "robots_fetch_failed":
-            return False, "robots_fetch_failed: policy cannot be safely established"
-        if status == "allow_all_404" or parser is None:
+        if res is None or res.status_code in (401, 403) or res.status_code >= 500:
+            reason = (
+                f"robots_fetch_failed: HTTP {res.status_code}"
+                if res
+                else "robots_fetch_failed: network_error_or_timeout"
+            )
+            with self._shared_lock:
+                self._shared_cache[domain_key] = (None, "robots_fetch_failed", now, None)
+            logger.warning(
+                "robots.txt for %s could not be retrieved (%s). Crawling disallowed.",
+                domain_key,
+                reason,
+            )
+            return False, reason
+        elif res.status_code == 404:
+            with self._shared_lock:
+                self._shared_cache[domain_key] = (None, "allow_all_404", now, None)
             return True, "allow_all_404"
+        elif res.status_code == 200:
+            try:
+                robots_text = res.content_bytes.decode("utf-8", errors="replace")
+                rp = RobotFileParser()
+                rp.parse(robots_text.splitlines())
+                cd_directive = extract_crawl_delay_directive(robots_text, self.user_agent)
+                with self._shared_lock:
+                    self._shared_cache[domain_key] = (rp, "parsed", now, cd_directive)
+                allowed = rp.can_fetch(self.user_agent, url)
+                if not allowed:
+                    logger.info(
+                        "URL %s disallowed by robots.txt for user-agent %s", url, self.user_agent
+                    )
+                    return False, f"disallowed_by_robots_txt: path blocked for {self.user_agent}"
+                return True, "allowed_by_robots_txt"
+            except Exception as exc:
+                with self._shared_lock:
+                    self._shared_cache[domain_key] = (None, "robots_parse_failed", now, None)
+                return False, f"robots_parse_failed: {exc}"
+        else:
+            with self._shared_lock:
+                self._shared_cache[domain_key] = (None, "robots_fetch_failed", now, None)
+            return False, f"robots_fetch_failed: HTTP {res.status_code}"
 
-        # Check user-agent directive (NexoraBot, falls back to * if no specific entry)
-        allowed = parser.can_fetch(self.user_agent, url)
-        if not allowed:
-            logger.info("URL %s disallowed by robots.txt for user-agent %s", url, self.user_agent)
-            return False, f"disallowed_by_robots_txt: path blocked for {self.user_agent}"
+    def apply_rate_limit(self, url: str) -> float:
+        """Enforce domain-level pacing respecting full Crawl-delay directives.
 
-        return True, "allowed_by_robots_txt"
-
-    def apply_rate_limit(self, url: str) -> None:
+        Prevents concurrency races across all adapters by atomically reserving
+        execution timestamps under a shared thread-safe lock.
+        Returns the duration slept in seconds.
+        """
         domain_key = self.get_domain_key(url)
         if not domain_key:
-            return
+            return 0.0
 
-        now = time.time()
-        last_time = self._last_request_time.get(domain_key, 0.0)
+        delay = self.get_crawl_delay(url)
 
-        delay = self.default_crawl_delay
-        cached = self._cache.get(domain_key)
-        if cached and cached[0]:
-            try:
-                cd_val = cached[0].crawl_delay(self.user_agent) or cached[0].crawl_delay("*")
-                if cd_val is not None:
-                    parsed_cd = float(cd_val)
-                    if parsed_cd > 0:
-                        delay = min(parsed_cd, 2.0)
-            except Exception:
-                pass
+        with self._shared_lock:
+            now = time.time()
+            scheduled_time = max(now, self._domain_next_allowed_time.get(domain_key, 0.0))
+            wait_seconds = scheduled_time - now
+            self._domain_next_allowed_time[domain_key] = scheduled_time + delay
+            self._domain_last_request_time[domain_key] = scheduled_time
 
-        elapsed = now - last_time
-        if elapsed < delay:
-            time.sleep(delay - elapsed)
+        if wait_seconds > 0.0:
+            time.sleep(wait_seconds)
 
-        self._last_request_time[domain_key] = time.time()
+        return wait_seconds
 
 
 class SSRFSafeFetcher:
