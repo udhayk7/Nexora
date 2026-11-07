@@ -153,6 +153,23 @@ from app.schemas.tailoring import (
     TailoringSessionSummaryResponse,
     UpdateContentRequest,
 )
+from app.schemas.workflow import (
+    ApprovePreparationRequest,
+    CareerWorkflowRunResponse,
+    CareerWorkflowStepResponse,
+    GmailExecuteRequest,
+    OnboardingConfirmRequest,
+    OnboardingResultResponse,
+    OnboardingStartRequest,
+    PortalConfirmRequest,
+    PortalOpenResponse,
+    PreparationDetailResponse,
+    PreparationStartRequest,
+    UnifiedDiscoveryResponse,
+    UnifiedOpportunityItem,
+    WorkflowDashboardResponse,
+    WorkflowRecommendedAction,
+)
 
 __all__ = [
     "HealthResponse",
@@ -288,4 +305,19 @@ __all__ = [
     "AIPortfolioAssistRequest",
     "AIPortfolioAssistResponse",
     "SlugUpdateRequest",
+    "CareerWorkflowRunResponse",
+    "CareerWorkflowStepResponse",
+    "OnboardingStartRequest",
+    "OnboardingConfirmRequest",
+    "OnboardingResultResponse",
+    "UnifiedOpportunityItem",
+    "UnifiedDiscoveryResponse",
+    "PreparationStartRequest",
+    "PreparationDetailResponse",
+    "ApprovePreparationRequest",
+    "PortalOpenResponse",
+    "PortalConfirmRequest",
+    "GmailExecuteRequest",
+    "WorkflowRecommendedAction",
+    "WorkflowDashboardResponse",
 ]

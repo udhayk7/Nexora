@@ -107,6 +107,31 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
+            href="/dashboard/career-workflow"
+            className="group sm:col-span-2 p-6 rounded-xl border border-primary/40 bg-gradient-to-r from-card via-primary/5 to-purple-500/5 hover:border-primary/80 transition-all shadow-md"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-primary/15 text-primary">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary">
+                  New • End-to-End Pipeline
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open Career Workflow <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+              Unified Career Workflow & Automation
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              Connected AI-powered journey: Upload Resume → Understand Candidate → Discover &amp; Rank Jobs → Prepare 8 Connected Assets → Candidate Approval Gate → Apply &amp; Confirm.
+            </p>
+          </Link>
+
+          <Link
             href="/dashboard/career-command-center"
             className="group sm:col-span-2 p-6 rounded-xl border border-primary/30 bg-gradient-to-r from-card via-card to-primary/5 hover:border-primary/70 transition-all shadow-sm"
           >

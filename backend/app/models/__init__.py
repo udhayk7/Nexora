@@ -49,6 +49,7 @@ from app.models.resume import Resume, ResumeVersion
 from app.models.tailoring import ResumeTailoringChange, ResumeTailoringSession
 from app.models.token import RefreshToken
 from app.models.user import User
+from app.models.workflow import CareerWorkflowRun, CareerWorkflowStep
 
 __all__ = [
     "Base",
@@ -97,4 +98,6 @@ __all__ = [
     "PortfolioProject",
     "PortfolioVersion",
     "PortfolioViewEvent",
+    "CareerWorkflowRun",
+    "CareerWorkflowStep",
 ]

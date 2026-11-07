@@ -110,6 +110,15 @@ Nexora is an AI-powered career discovery and application management platform des
 - Privacy-conscious visitor analytics tracking page views, project clicks, downloads, referrers, and device categories without collecting visitor PII.
 - Comprehensive database schema (`Portfolio`, `PortfolioSection`, `PortfolioProject`, `PortfolioVersion`, `PortfolioViewEvent`) and 20+ REST API endpoints under `/api/v1/portfolios/*`.
 
+### 21. Unified Career Workflow & Automation (Prompt 21)
+- Connected end-to-end AI career pipeline connecting all independent modules into a single journey: Upload resume → Understand candidate profile → Discover jobs → Rank opportunities → Prepare 8 connected assets → Candidate approval gate → Apply & Confirm → Track progress → Prepare for interviews.
+- Unified candidate onboarding: Extracts facts from uploaded resume, infers target roles and preferences, updates `UserMatchingPreference` and `Portfolio`, initializes matching, and provides candidate review & correction gate (unverified inferences are never treated as confirmed facts).
+- Unified opportunity discovery & prioritization: Active job ranking with early-career / fresher detection, premier employer tier prioritization (Product companies, MNCs, GCCs, Big 4, top tech startups), and verification provenance categorization (verified direct, corroborated, unverified portal).
+- Intelligent application preparation workspace connecting 8 assets: Job Intelligence, Compatibility Assessment, Tailored Resume, Cover Letter, Recruiter Email, Screening Q&A Prep, Company Research, and Interview Prep Starter.
+- Explicit candidate approval gates: Require explicit confirmation for consequential actions; Gmail dispatch requires `confirm_send=True`; official portal opening provides verified URL and assisted form auto-fill guidance while strictly decoupling opening from application submission confirmation.
+- Resilient background orchestration: Persistent state machine (`CareerWorkflowRun`, `CareerWorkflowStep`) executed via Celery and Redis with bounded retries ($\le 3$), idempotency, failure recovery, and cancellation controls.
+- Dedicated UI workspace at `/dashboard/career-workflow` featuring visual pipeline progress, KPI stats, prioritized recommended actions, discovery opportunities, 8-asset preparation modal, execution gates, onboarding review drawer, and workflow run history.
+
 ---
 
 ## Non-Functional Requirements

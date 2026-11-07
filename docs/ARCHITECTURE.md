@@ -910,5 +910,52 @@ All endpoints mounted under `/api/v1/portfolios` with tenant isolation and publi
 - `GET /api/v1/portfolios/public/{slug}/export/pdf`: Public recruiter PDF download.
 - `GET /api/v1/portfolios/public/{slug}/export/html`: Public recruiter offline HTML download.
 
+## 25. Unified Career Workflow & Automation Architecture
+
+### 25.1 Overview & System Invariants
+The Unified Career Workflow & Automation engine transforms Nexora from independent career management tools into a connected, AI-guided autonomous journey:
+`Upload resume → Understand candidate profile → Discover jobs → Rank opportunities → Prepare 8 connected assets → Candidate approval gate → Apply & Confirm → Track progress → Prepare for interviews`.
+
+Core architectural invariants:
+1. **Reuse of Existing Modules**: Reuses existing DB models and services (`resumes`, `job_intelligences`, `job_matches`, `application_preparations`, `cover_letters`, `application_emails`, `job_applications`, `company_intelligence`, `interview_preparation_sessions`). Avoids duplicate models or shadow workflows.
+2. **Strict Candidate Approval Gate**: Consequential actions (email dispatch, formal application submission, status transitions to `applied`) require explicit candidate approval. Opening an application portal is strictly decoupled from submission confirmation.
+3. **Audit Provenance & Grounded Evidence**: Opportunity recommendations and preparation materials cite source provenance, matching dimensions, and verified resume facts. Unverified AI inferences are flagged and never treated as confirmed facts without user verification.
+4. **Resilient Background Orchestration**: Background workflows run asynchronously via Celery and Redis. The state machine enforces bounded retries ($\le 3$), idempotency, failure recovery, and voluntary cancellation.
+
+### 25.2 Relational Database Models (`app/models/workflow.py`)
+- **`CareerWorkflowRun` (`career_workflow_runs`)**: Orchestration session per user. Tracks `workflow_type` (`candidate_onboarding`, `application_preparation`, `recommendation_refresh`), execution `status` (`pending`, `running`, `paused_awaiting_input`, `completed`, `failed`, `cancelled`), `current_step`, `progress_pct` (0-100), `error_message`, `retry_count`, and `step_data` JSONB.
+- **`CareerWorkflowStep` (`career_workflow_steps`)**: Individual discrete execution step within a workflow run. Tracks `step_number`, `step_name`, `status`, `input_payload` JSONB, `output_payload` JSONB, `error_message`, and timestamps.
+- **`ApplicationPreparation` Extended Fields (`app/models/assistant.py`)**:
+  - `execution_status`: Tracks fine-grained execution lifecycle: `not_started`, `preparation_in_progress`, `awaiting_approval`, `ready_to_apply`, `application_page_opened`, `submission_pending_confirmation`, `submitted_and_confirmed`, `failed`, `withdrawn`.
+  - `execution_channel`: Selected delivery route: `gmail`, `official_portal`, `external_form`.
+  - `execution_metadata`: JSONB audit record of confirmations, token IDs, and channel parameters.
+
+### 25.3 Connected Application Preparation Workspace
+Integrates 8 unified assets into one cohesive candidate cockpit:
+1. **Job Intelligence**: Structured requirements, must-have skills, role summary, and work arrangement from `JobIntelligence`.
+2. **Compatibility Assessment**: Deterministic match score, dimensional breakdown, strengths, and identified skill gaps from `JobMatch`.
+3. **Tailored Resume**: Grounded tailored `ResumeVersion` linked to the job requisition.
+4. **Cover Letter**: Evidence-grounded `CoverLetter` with version history and approval tracking.
+5. **Recruiter Email**: Personalized `ApplicationEmail` for outreach with preview and send gate.
+6. **Screening Q&A Prep**: Factual STAR talking points grounded in candidate resume bullets and portfolio projects.
+7. **Company Research**: Verified tech stack, overview, and hiring trends from `CompanyIntelligence`.
+8. **Interview Prep Starter**: Curated technical topics and mock interview readiness link.
+
+### 25.4 REST API Endpoints (`/api/v1/career-workflow/*`)
+- `GET /api/v1/career-workflow/dashboard`: Aggregated pipeline KPIs, candidate onboarding status, prioritized next actions, and recent workflow runs.
+- `POST /api/v1/career-workflow/onboarding/start`: Extracts profile from resume, infers target roles and preferences, and initializes personalized job matching.
+- `POST /api/v1/career-workflow/onboarding/confirm`: Candidate review gate to approve, correct, and persist career preferences to `UserMatchingPreference` and `Portfolio`.
+- `GET /api/v1/career-workflow/discovery`: Unified opportunity ranking with early-career detection, employer tier prioritization, and verification provenance.
+- `POST /api/v1/career-workflow/preparation/start`: Initializes the 8-asset application preparation workspace for a target job.
+- `GET /api/v1/career-workflow/preparation/{job_id}`: Retrieves complete application preparation assets for a job requisition.
+- `POST /api/v1/career-workflow/preparation/{job_id}/approve`: Explicit candidate sign-off gate setting status to `ready_to_apply`.
+- `POST /api/v1/career-workflow/execution/portal-open/{job_id}`: Retrieves verified portal URL and assisted form auto-fill guidance; sets state to `application_page_opened` without claiming submission.
+- `POST /api/v1/career-workflow/execution/portal-confirm/{job_id}`: Candidate explicit confirmation of completed portal submission, updating status to `applied`.
+- `POST /api/v1/career-workflow/execution/gmail-send/{job_id}`: Dispatches approved email via Gmail OAuth requiring `confirm_send=True`.
+- `POST /api/v1/career-workflow/execution/withdraw/{job_id}`: Withdraws application from active consideration.
+- `GET /api/v1/career-workflow/runs`: Lists user's past and active workflow orchestration runs.
+- `POST /api/v1/career-workflow/runs/{id}/cancel`: Cancels an active or pending workflow run.
+
+
 
 

@@ -52,6 +52,15 @@ def protected_view(current_user: User = Depends(get_current_active_user)):
 - **Cost Safeguards**: Enforce `AI_MAX_INPUT_CHARS` (default 25,000) and request timeouts.
 - **Testing Rule**: Never call live AI provider APIs in automated tests or CI. Always use deterministic mocks and fixtures.
 
+### Unified Career Workflow & Candidate Approval Boundaries
+- **Candidate in Control**: The platform never silently submits job applications, dispatches emails, or modifies candidate preferences without explicit sign-off.
+- **Explicit Gate Enforcements**:
+  - Email dispatch (`execute_gmail_application`) requires `confirm_send=True` and prior candidate approval.
+  - Opening an official application portal (`open_application_portal`) provides assisted form data but strictly sets state to `application_page_opened`. It must NEVER transition to `applied` or claim submission.
+  - Final application submission is recorded ONLY when the candidate explicitly confirms (`confirm_portal_submission`).
+- **No Inferred Facts**: AI-extracted target roles, preferences, and skill alignments during onboarding must be presented as proposals for candidate verification, never treated as confirmed facts.
+- **Bounded Background Retries**: Workflow orchestration runs via Celery enforce a maximum of 3 retries on transient errors and record failures deterministically.
+
 ### Alembic Migration Workflow
 - Ensure PostgreSQL is running:
   ```bash

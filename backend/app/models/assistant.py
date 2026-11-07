@@ -131,6 +131,25 @@ class ApplicationPreparation(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
+    execution_status: Mapped[str] = mapped_column(
+        String(50),
+        default="not_started",
+        nullable=False,
+        index=True,
+        # "not_started", "preparation_in_progress", "awaiting_approval",
+        # "ready_to_apply", "application_page_opened", "submission_pending_confirmation",
+        # "submitted_and_confirmed", "failed", "withdrawn"
+    )
+    execution_channel: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        # "gmail", "official_portal", "external_form"
+    )
+    execution_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        default=dict,
+        nullable=False,
+    )
     checklist_items: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"),
         default=list,

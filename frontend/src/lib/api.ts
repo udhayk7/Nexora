@@ -3507,6 +3507,263 @@ export const portfoliosApi = {
     `${API_BASE}/api/v1/portfolios/public/${publicSlug}/export/html`,
 };
 
+// ============================================================================
+// Career Workflow & Automation Interfaces & API
+// ============================================================================
+
+export interface WorkflowRecommendedAction {
+  action_type: string;
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+  target_route: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CareerWorkflowStepSummary {
+  id: string;
+  step_number: number;
+  step_name: string;
+  status: string;
+  input_payload?: Record<string, unknown>;
+  output_payload?: Record<string, unknown>;
+  error_message?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface CareerWorkflowRunSummary {
+  id: string;
+  workflow_type: string;
+  status: "pending" | "running" | "paused_awaiting_input" | "completed" | "failed" | "cancelled";
+  current_step?: string | null;
+  progress_pct: number;
+  error_message?: string | null;
+  retry_count: number;
+  step_data?: Record<string, unknown>;
+  started_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  steps: CareerWorkflowStepSummary[];
+}
+
+export interface WorkflowDashboardData {
+  profile_completion_pct: number;
+  profile_missing_items: string[];
+  new_opportunities_count: number;
+  recommended_opportunities_count: number;
+  jobs_requiring_review_count: number;
+  applications_awaiting_approval_count: number;
+  applications_submitted_count: number;
+  incomplete_preparations_count: number;
+  upcoming_interviews_count: number;
+  recommended_next_actions: WorkflowRecommendedAction[];
+  recent_workflow_runs: CareerWorkflowRunSummary[];
+}
+
+export interface OnboardingStartResult {
+  workflow_run_id: string;
+  status: string;
+  extracted_roles: string[];
+  extracted_skills: string[];
+  extracted_experience_years?: number | null;
+  extracted_education?: string | null;
+  inferred_preferences: Record<string, unknown>;
+  matching_jobs_count: number;
+  top_matches: Array<{
+    job_id: string;
+    job_title: string;
+    company_name: string;
+    match_score: number;
+  }>;
+}
+
+export interface OnboardingConfirmPayload {
+  target_role_families: string[];
+  preferred_locations: string[];
+  work_arrangement_preferences: string[];
+  min_salary?: number | null;
+  salary_currency?: string;
+  seniority: string;
+}
+
+export interface UnifiedOpportunityItem {
+  job_id: string;
+  title: string;
+  company_name: string;
+  company_id?: string | null;
+  company_tier: string;
+  location_text?: string | null;
+  work_arrangement: string;
+  seniority_level: string;
+  is_entry_level: boolean;
+  match_score?: number | null;
+  match_reasons: string[];
+  skill_gaps: string[];
+  eligibility_concerns: string[];
+  verification_status: string;
+  source_provenance?: string | null;
+  application_url?: string | null;
+}
+
+export interface UnifiedDiscoveryData {
+  total_active_jobs: number;
+  entry_level_count: number;
+  priority_tier_count: number;
+  opportunities: UnifiedOpportunityItem[];
+}
+
+export interface PreparationDetailData {
+  preparation_id: string;
+  job_id: string;
+  job_title: string;
+  company_name: string;
+  application_id?: string | null;
+  execution_status: string;
+  execution_channel?: string | null;
+  checklist_status: string;
+  checklist_items: Array<{ item: string; done: boolean; notes?: string }>;
+  job_intelligence?: {
+    role_summary?: string;
+    primary_responsibilities?: string[];
+    must_have_skills?: string[];
+    nice_to_have_skills?: string[];
+    work_culture_signals?: string;
+  } | null;
+  compatibility_assessment?: {
+    overall_score?: number;
+    breakdown?: Record<string, unknown>;
+    strengths?: string[];
+    gaps?: string[];
+  } | null;
+  tailored_resume?: {
+    version_id: string;
+    version_number: number;
+    filename?: string | null;
+    is_tailored: boolean;
+  } | null;
+  cover_letter?: {
+    id: string;
+    version_number: number;
+    content: string;
+    is_approved: boolean;
+    grounded_evidence: Array<Record<string, unknown>>;
+  } | null;
+  recruiter_email?: {
+    id: string;
+    subject: string;
+    body_text: string;
+    status: string;
+    is_approved: boolean;
+    recipient_email?: string | null;
+  } | null;
+  screening_qa_prep: Array<{ question: string; answer_outline: string; status: string }>;
+  company_research?: {
+    company_overview?: string;
+    industry?: string;
+    hiring_summary?: Record<string, unknown>;
+    technologies_confirmed?: string[];
+  } | null;
+  interview_prep_starter?: {
+    suggested_topics: string[];
+    difficulty: string;
+    mock_ready: boolean;
+  } | null;
+  portal_url?: string | null;
+  can_apply: boolean;
+}
+
+export interface PortalOpenResult {
+  portal_url: string;
+  assisted_form_data: Record<string, string>;
+  execution_status: string;
+  opened_at: string;
+}
+
+export const careerWorkflowApi = {
+  getDashboard: () =>
+    apiClient<WorkflowDashboardData>("/career-workflow/dashboard"),
+
+  startOnboarding: (resumeId?: string, preferencesOverride?: Record<string, unknown>) =>
+    apiClient<OnboardingStartResult>("/career-workflow/onboarding/start", {
+      method: "POST",
+      body: JSON.stringify({
+        resume_id: resumeId,
+        preferences_override: preferencesOverride,
+      }),
+    }),
+
+  confirmOnboarding: (data: OnboardingConfirmPayload) =>
+    apiClient<{ status: string; message: string }>("/career-workflow/onboarding/confirm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getDiscovery: (filterEntryLevel = true, prioritizeTiers = true, limit = 30) =>
+    apiClient<UnifiedDiscoveryData>(
+      `/career-workflow/discovery?filter_entry_level=${filterEntryLevel}&prioritize_tiers=${prioritizeTiers}&limit=${limit}`
+    ),
+
+  startPreparation: (jobId: string, resumeId?: string) =>
+    apiClient<PreparationDetailData>("/career-workflow/preparation/start", {
+      method: "POST",
+      body: JSON.stringify({ job_id: jobId, resume_id: resumeId }),
+    }),
+
+  getPreparation: (jobId: string) =>
+    apiClient<PreparationDetailData>(`/career-workflow/preparation/${jobId}`),
+
+  approvePreparation: (
+    jobId: string,
+    channel: "official_portal" | "gmail" | "external_form",
+    notes?: string
+  ) =>
+    apiClient<PreparationDetailData>(`/career-workflow/preparation/${jobId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ channel, notes }),
+    }),
+
+  openPortal: (jobId: string) =>
+    apiClient<PortalOpenResult>(`/career-workflow/execution/portal-open/${jobId}`, {
+      method: "POST",
+    }),
+
+  confirmPortalSubmission: (jobId: string, confirmationNotes?: string) =>
+    apiClient<{ status: string; execution_status: string; message: string; confirmed_at: string }>(
+      `/career-workflow/execution/portal-confirm/${jobId}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ confirmation_notes: confirmationNotes }),
+      }
+    ),
+
+  executeGmail: (jobId: string, emailId: string, confirmSend = true) =>
+    apiClient<{ status: string; execution_status: string; message: string; confirmed_at: string }>(
+      `/career-workflow/execution/gmail-send/${jobId}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email_id: emailId, confirm_send: confirmSend }),
+      }
+    ),
+
+  withdraw: (jobId: string) =>
+    apiClient<{ status: string; execution_status: string; message: string }>(
+      `/career-workflow/execution/withdraw/${jobId}`,
+      {
+        method: "POST",
+      }
+    ),
+
+  listRuns: () =>
+    apiClient<CareerWorkflowRunSummary[]>("/career-workflow/runs"),
+
+  cancelRun: (runId: string) =>
+    apiClient<{ status: string; message: string }>(`/career-workflow/runs/${runId}/cancel`, {
+      method: "POST",
+    }),
+};
+
+
 
 
 

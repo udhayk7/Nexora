@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.resume import Resume
     from app.models.tailoring import ResumeTailoringSession
     from app.models.token import RefreshToken
+    from app.models.workflow import CareerWorkflowRun
 
 
 class User(Base, TimestampMixin):
@@ -169,5 +170,10 @@ class User(Base, TimestampMixin):
         "Portfolio",
         back_populates="user",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    workflow_runs: Mapped[list["CareerWorkflowRun"]] = relationship(
+        "CareerWorkflowRun",
+        back_populates="user",
         cascade="all, delete-orphan",
     )
