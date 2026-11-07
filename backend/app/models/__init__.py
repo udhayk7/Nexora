@@ -7,6 +7,12 @@ from app.models.application import (
     ApplicationStatusHistory,
     JobApplication,
 )
+from app.models.assistant import (
+    ApplicationEmail,
+    ApplicationPreparation,
+    CoverLetter,
+    GmailConnection,
+)
 from app.models.base import Base
 from app.models.company import Company, CompanySource, DiscoveryScanLog
 from app.models.job import Job, JobSource, JobVerification
@@ -43,4 +49,8 @@ __all__ = [
     "ApplicationInterview",
     "Notification",
     "UserNotificationPreference",
+    "GmailConnection",
+    "ApplicationPreparation",
+    "CoverLetter",
+    "ApplicationEmail",
 ]

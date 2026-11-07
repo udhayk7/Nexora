@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
+  Bot,
   Briefcase,
   Building2,
   Calendar,
@@ -948,6 +949,14 @@ function ApplicationsContent() {
                         {/* Actions */}
                         <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              href={`/dashboard/application-assistant?application_id=${app.id}${app.job_id ? `&job_id=${app.job_id}` : ""}`}
+                              className="px-2 py-1 text-xs rounded border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary transition inline-flex items-center gap-1 font-medium"
+                              title="Prepare with AI Assistant"
+                            >
+                              <Bot className="w-3 h-3" />
+                              Assistant
+                            </Link>
                             <button
                               onClick={() => {
                                 setQuickStatusApp(app);
@@ -1043,16 +1052,24 @@ function ApplicationsContent() {
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setQuickStatusApp(appDetail);
-                        setTransitionStatus(appDetail.status);
-                        setTransitionConfirmSub(appDetail.submission_confirmed);
-                      }}
-                      className="px-2.5 py-1 text-xs font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90 transition"
-                    >
-                      Change Status
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/application-assistant?application_id=${appDetail.id}${appDetail.job_id ? `&job_id=${appDetail.job_id}` : ""}`}
+                        className="px-2.5 py-1 text-xs font-semibold rounded border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition inline-flex items-center gap-1"
+                      >
+                        <Bot className="w-3.5 h-3.5" /> AI Assistant
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setQuickStatusApp(appDetail);
+                          setTransitionStatus(appDetail.status);
+                          setTransitionConfirmSub(appDetail.submission_confirmed);
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90 transition"
+                      >
+                        Change Status
+                      </button>
+                    </div>
                   </div>
 
                   {/* Submission Flag */}

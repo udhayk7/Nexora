@@ -480,6 +480,89 @@ Nexora's AI Job Intelligence and Personalized Recommendations system pairs the d
 
 ---
 
+## 19. AI Application Assistant & Gmail Integration Architecture
+
+### 19.1 Philosophy & Safety Invariants
+- **Human In The Loop**: Nexora prepares, formats, drafts, and inspects application materials. Every external submission or dispatch requires deliberate, explicit confirmation by the authenticated user immediately prior to execution.
+- **Strict Zero-Fabrication**: Cover letters, recruiter emails, and screening Q&A answers are grounded exclusively in verified facts from the candidate's resume analysis. When candidate-specific details (e.g. work authorization, notice period, compensation expectations) are missing, the system strictly refuses to invent answers and flags `missing_info` for candidate input.
+- **Portal Decoupling**: Opening an external company application portal or career URL records a `portal_opened_at` audit timestamp, but **never** marks the application as submitted. Submission confirmation is strictly independent and requires explicit confirmation (`confirm_submission=True`).
+
+### 19.2 Google Cloud Console & OAuth 2.0 Setup
+1. **Google Cloud Console Configuration**:
+   - Create or select a Google Cloud Project in [Google Cloud Console](https://console.cloud.google.com/).
+   - Enable the **Gmail API** and **Google People API** under APIs & Services.
+   - Configure the OAuth Consent Screen: User Type: External; add test users if in Testing status.
+   - Create Credentials: **OAuth client ID** $\rightarrow$ Application Type: **Web application**.
+2. **Authorized Redirect URIs**:
+   - `http://localhost:3000/dashboard/application-assistant` (Frontend callback handler)
+   - `http://localhost:8000/api/v1/integrations/google/callback` (Backend direct callback handler)
+3. **Environment Variables**:
+   - `GOOGLE_CLIENT_ID`: OAuth 2.0 Client ID from Google Cloud Console.
+   - `GOOGLE_CLIENT_SECRET`: OAuth 2.0 Client Secret.
+   - `GOOGLE_REDIRECT_URI`: Configured redirect URI (`http://localhost:3000/dashboard/application-assistant` or backend).
+   - `GMAIL_TOKEN_ENCRYPTION_KEY`: 32-byte URL-safe base64 key for Fernet AES-128-CBC + HMAC-SHA256 encryption. If unset, automatically derives a reproducible Fernet key from `SECRET_KEY`.
+4. **Least-Privilege Scopes**:
+   - `https://www.googleapis.com/auth/userinfo.email`: Resolves connected email identity.
+   - `https://www.googleapis.com/auth/gmail.compose`: Creates drafts and sends approved outgoing messages.
+   - *Nexora never requests full mailbox read access (`gmail.readonly` or `mail.google.com`).*
+
+### 19.3 Security: Token Encryption & State CSRF Mitigation
+- **Token Encryption at Rest (`token_encryption.py`)**:
+  - Access and refresh tokens are encrypted prior to database persistence using Fernet symmetric encryption (AES-128-CBC with PKCS7 padding and HMAC-SHA256 authenticated integrity).
+  - API responses strictly omit raw and encrypted tokens, exposing only connection status, email address, and granted scopes.
+- **Tamper-Proof OAuth State (`oauth_state.py`)**:
+  - State token format: `<base64_json_payload>.<hmac_sha256_signature>`.
+  - Encodes `user_id`, action (`gmail_connect`), nonce, and UNIX timestamp.
+  - Verification validates signature with `SECRET_KEY`, matches user identity, and rejects states older than 15 minutes (900 seconds) or with future timestamps.
+
+### 19.4 Application Preparation Workspace
+- **Model**: `ApplicationPreparation` (`application_preparations` table with migration `e431f850829f`).
+- **Milestone Checklist Items**:
+  1. `review_job`: Review role responsibilities and requirements.
+  2. `select_resume`: Choose target resume and version.
+  3. `tailor_resume`: Shortcut to Resume Tailoring Studio.
+  4. `generate_cover_letter`: Synthesize and approve tailored cover letter.
+  5. `prepare_recruiter_email`: Compose and approve outreach/application email.
+  6. `review_qa_answers`: Review truthful answers to screening questions.
+  7. `prepare_documents`: Validate required attachments ($\le 10$MB).
+  8. `open_application_portal`: Visit external career portal.
+  9. `confirm_application_submitted`: Confirm external submission completed.
+- **Progression Statuses**: `not_started`, `in_progress`, `ready_for_review`, `completed`.
+
+### 19.5 AI Cover Letter Generator & PDF Export
+- **Grounding Strategy**:
+  - Analyzes role requirements from `Job` and verified achievements from `ResumeAnalysisResult`.
+  - Generates structured sections: `opening`, `body_paragraphs` (with skills alignment and specific experience citations), and `closing`.
+  - Fallback engine: `DeterministicCoverLetterGenerator` ensures high quality even in offline or API-constrained environments.
+- **ReportLab PDF Compilation (`cover_letter_pdf.py`)**:
+  - Generates polished, single-page A4 PDF documents with professional typography, candidate header, recipient block, clean margins, and page numbers.
+
+### 19.6 Recruiter Email & Gmail Dispatch Workflow
+- **6 Supported Communication Types**:
+  1. `direct_application`: Formal job application submission.
+  2. `recruiter_outreach`: Direct recruiter introduction and interest pitch.
+  3. `referral_request`: Polite internal employee referral request.
+  4. `follow_up`: Respectful status inquiry post-application.
+  5. `interview_follow_up`: Re-alignment of strengths after an interview round.
+  6. `thank_you`: Post-interview gratitude note.
+- **Anti-Guessing Guardrail**: Nexora never guesses recruiter email addresses. Recipient emails must be explicitly provided by the user or pre-existing on the application record.
+- **Gmail Draft Creation**:
+  - Builds RFC 2822 MIME message (`email.mime.multipart.MIMEMultipart`) with optional resume and cover letter PDF attachments.
+  - Calls Gmail API `POST /gmail/v1/users/me/drafts`, storing `gmail_draft_id`.
+- **Direct Dispatch & Duplicate-Send Prevention**:
+  - Requires explicit confirmation immediately before execution: payload must include `confirm_send=True`.
+  - If email has already been sent (`status == 'sent'`), further dispatch calls are strictly rejected with HTTP 400.
+  - Attachment safety: Enforces maximum total attachment size $\le 10$MB (`10,485,760` bytes) and validates storage paths to prevent path traversal leaks.
+
+### 19.7 Audit & Activity Logging
+- Logs security and operational events to `audit_logs` and `application_activities`:
+  - `cover_letter_generated`, `cover_letter_approved`
+  - `recruiter_email_generated`, `recruiter_email_approved`
+  - `gmail_draft_created`, `email_sent`
+  - `portal_opened`, `application_submitted`
+
+---
+
 ## Token & Cookie Security Strategy
 
 | Aspect | Strategy & Implementation | Tradeoff / Mitigation |

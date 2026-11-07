@@ -200,4 +200,3 @@ def update_job_recommendation_state(
         is_saved=data.is_saved,
         is_dismissed=data.is_dismissed,
     )
-

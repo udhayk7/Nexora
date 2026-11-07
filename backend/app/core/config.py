@@ -58,6 +58,16 @@ class Settings(BaseSettings):
     JOB_FRESHNESS_RECENT_DAYS: int = 7
     JOB_FRESHNESS_DUE_DAYS: int = 14
 
+    # Google OAuth & Gmail Integration
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:3000/dashboard/application-assistant/callback"
+    GMAIL_TOKEN_ENCRYPTION_KEY: Optional[str] = None
+    GMAIL_SCOPES: list[str] = [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/gmail.compose",
+    ]
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: Literal["json", "text"] = "text"

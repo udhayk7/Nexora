@@ -33,6 +33,17 @@ Nexora is an AI-powered career discovery and application management platform des
 - Heavy processing (document parsing, embeddings generation, large LLM requests) delegated to Celery worker tasks via Redis queues.
 - Real-time or polled progress feedback to the client.
 
+### 6. AI Application Assistant & Communication Integrations (Completed — Prompt 15)
+- Application Preparation Workspace with interactive milestone progress tracking (`not_started`, `in_progress`, `ready_for_review`, `completed`).
+- AI-powered grounded cover letter generation with verbatim resume evidence citations and ReportLab PDF compilation.
+- Recruiter outreach email composer supporting 6 communication types (`direct_application`, `recruiter_outreach`, `referral_request`, `follow_up`, `interview_follow_up`, `thank_you`).
+- Zero-fabrication guardrail: Nexora never guesses or infers recruiter email addresses, and flags `missing_info` for candidate-specific legal/timeline details.
+- Official Google OAuth 2.0 flow with minimal scopes (`userinfo.email`, `gmail.compose`) and AES-128-CBC + HMAC-SHA256 Fernet encryption at rest.
+- CSRF-protected, HMAC-SHA256 signed timestamped state verification with 15-minute expiration.
+- Gmail Draft creation and direct email dispatch requiring explicit, immediately-preceding confirmation (`confirm_send=True`).
+- Strict duplicate-send prevention and 10MB total attachment size limits.
+- External application portal checklist assistance with submission confirmation strictly decoupled from portal URL opens.
+
 ---
 
 ## Non-Functional Requirements

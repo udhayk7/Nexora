@@ -800,4 +800,3 @@ class RecommendationService:
             is_saved=match.is_saved,
             is_dismissed=match.is_dismissed,
         )
-

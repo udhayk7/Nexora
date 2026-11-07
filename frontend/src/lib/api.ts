@@ -779,6 +779,22 @@ export interface JobMatchFilterParams {
 }
 
 // ---------------------------------------------------------------------------
+// Jobs API Client
+// ---------------------------------------------------------------------------
+
+export const jobsApi = {
+  listJobs: (params?: { page?: number; page_size?: number; q?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append("page", String(params.page));
+    if (params?.page_size) q.append("per_page", String(params.page_size));
+    if (params?.q) q.append("q", params.q);
+    const qs = q.toString();
+    return apiClient<JobListResponse>(`/jobs${qs ? `?${qs}` : ""}`);
+  },
+  getJob: (id: string) => apiClient<JobDetail>(`/jobs/${id}`),
+};
+
+// ---------------------------------------------------------------------------
 // Resume API Client
 // ---------------------------------------------------------------------------
 
@@ -1854,6 +1870,300 @@ export const recommendationsApi = {
 };
 
 export const matchesApi = matchingApi;
+
+// ============================================================================
+// Application Assistant & Gmail Integration Interfaces
+// ============================================================================
+
+export interface GoogleAuthUrlResponse {
+  authorization_url: string;
+  state: string;
+}
+
+export interface GmailConnectionStatus {
+  is_connected: boolean;
+  email: string | null;
+  scopes: string[];
+  connected_at: string | null;
+  is_token_valid: boolean;
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  completed: boolean;
+  required: boolean;
+  category: string;
+  notes: string | null;
+}
+
+export interface ApplicationPreparation {
+  id: string;
+  user_id: string;
+  job_id: string;
+  application_id: string | null;
+  resume_id: string | null;
+  resume_version_id: string | null;
+  checklist_status: "not_started" | "in_progress" | "ready_for_review" | "completed";
+  checklist_items: ChecklistItem[];
+  qa_answers: QAItem[];
+  portal_opened_at: string | null;
+  submission_confirmed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CoverLetter {
+  id: string;
+  user_id: string;
+  job_id: string;
+  preparation_id: string | null;
+  resume_version_id: string | null;
+  version_number: number;
+  title: string;
+  content: string;
+  opening: string | null;
+  body_paragraphs: string[];
+  closing: string | null;
+  skill_alignment: string[];
+  experience_references: Array<{ name?: string; description?: string }>;
+  user_instructions: string | null;
+  is_approved: boolean;
+  approved_at: string | null;
+  pdf_path: string | null;
+  provider: string | null;
+  model: string | null;
+  is_deterministic_fallback: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationEmail {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  application_id: string | null;
+  preparation_id: string | null;
+  email_type: string;
+  recipient_email: string | null;
+  recipient_name: string | null;
+  subject: string;
+  body: string;
+  status: "draft" | "approved" | "sent" | "failed";
+  approval_confirmed_at: string | null;
+  send_confirmed_at: string | null;
+  sent_at: string | null;
+  gmail_draft_id: string | null;
+  gmail_message_id: string | null;
+  gmail_thread_id: string | null;
+  resume_version_id: string | null;
+  include_resume_attachment: boolean;
+  cover_letter_id: string | null;
+  include_cover_letter_attachment: boolean;
+  error_message: string | null;
+  metadata_json: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QAItem {
+  question: string;
+  answer: string;
+  grounded_evidence: string[];
+  confidence: string;
+  missing_info: string | null;
+}
+
+export interface ApplicationQAResponse {
+  job_id: string;
+  preparation_id: string | null;
+  resume_version_id: string | null;
+  items: QAItem[];
+}
+
+export const googleIntegrationsApi = {
+  getAuthUrl: () => apiClient<GoogleAuthUrlResponse>("/integrations/google/auth-url"),
+
+  getStatus: () => apiClient<GmailConnectionStatus>("/integrations/google/status"),
+
+  sendCallback: (code: string, state: string) =>
+    apiClient<GmailConnectionStatus>("/integrations/google/callback", {
+      method: "POST",
+      body: JSON.stringify({ code, state }),
+    }),
+
+  disconnect: () =>
+    apiClient<{ message: string }>("/integrations/google/disconnect", {
+      method: "POST",
+    }),
+};
+
+export const assistantApi = {
+  getOrCreatePreparation: (
+    jobId: string,
+    applicationId?: string,
+    resumeVersionId?: string
+  ) =>
+    apiClient<ApplicationPreparation>("/application-assistant/preparations", {
+      method: "POST",
+      body: JSON.stringify({
+        job_id: jobId,
+        application_id: applicationId || null,
+        resume_version_id: resumeVersionId || null,
+      }),
+    }),
+
+  getPreparation: (preparationId: string) =>
+    apiClient<ApplicationPreparation>(
+      `/application-assistant/preparations/${preparationId}`
+    ),
+
+  updateChecklistItem: (
+    preparationId: string,
+    itemId: string,
+    completed: boolean,
+    notes?: string
+  ) =>
+    apiClient<ApplicationPreparation>(
+      `/application-assistant/preparations/${preparationId}/checklist`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          item_id: itemId,
+          completed,
+          notes: notes || null,
+        }),
+      }
+    ),
+
+  recordPortalOpened: (preparationId: string) =>
+    apiClient<ApplicationPreparation>(
+      `/application-assistant/preparations/${preparationId}/portal-opened`,
+      {
+        method: "POST",
+      }
+    ),
+
+  confirmPortalSubmission: (data: {
+    job_id: string;
+    preparation_id?: string;
+    application_id?: string;
+    notes?: string;
+  }) =>
+    apiClient<ApplicationPreparation>(
+      "/application-assistant/preparations/confirm-submission",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+
+  generateCoverLetter: (data: {
+    job_id: string;
+    preparation_id?: string;
+    resume_version_id?: string;
+    user_instructions?: string;
+  }) =>
+    apiClient<CoverLetter>("/application-assistant/cover-letters/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getCoverLetter: (letterId: string) =>
+    apiClient<CoverLetter>(`/application-assistant/cover-letters/${letterId}`),
+
+  updateCoverLetter: (
+    letterId: string,
+    data: { title?: string; content?: string; is_approved?: boolean }
+  ) =>
+    apiClient<CoverLetter>(`/application-assistant/cover-letters/${letterId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  listCoverLettersForJob: (jobId: string) =>
+    apiClient<CoverLetter[]>(`/application-assistant/jobs/${jobId}/cover-letters`),
+
+  generateEmail: (data: {
+    job_id?: string;
+    application_id?: string;
+    preparation_id?: string;
+    resume_version_id?: string;
+    cover_letter_id?: string;
+    email_type: string;
+    recipient_email?: string;
+    recipient_name?: string;
+    user_instructions?: string;
+  }) =>
+    apiClient<ApplicationEmail>("/application-assistant/emails/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getEmail: (emailId: string) =>
+    apiClient<ApplicationEmail>(`/application-assistant/emails/${emailId}`),
+
+  updateEmail: (
+    emailId: string,
+    data: {
+      recipient_email?: string;
+      recipient_name?: string;
+      subject?: string;
+      body?: string;
+      include_resume_attachment?: boolean;
+      resume_version_id?: string;
+      include_cover_letter_attachment?: boolean;
+      cover_letter_id?: string;
+    }
+  ) =>
+    apiClient<ApplicationEmail>(`/application-assistant/emails/${emailId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  approveEmail: (emailId: string) =>
+    apiClient<ApplicationEmail>(
+      `/application-assistant/emails/${emailId}/approve`,
+      {
+        method: "POST",
+        body: JSON.stringify({ is_approved: true }),
+      }
+    ),
+
+  createGmailDraft: (emailId: string) =>
+    apiClient<ApplicationEmail>(
+      `/application-assistant/emails/${emailId}/gmail-draft`,
+      {
+        method: "POST",
+      }
+    ),
+
+  sendEmail: (emailId: string, confirmSend: boolean, idempotencyKey?: string) =>
+    apiClient<ApplicationEmail>(`/application-assistant/emails/${emailId}/send`, {
+      method: "POST",
+      body: JSON.stringify({
+        email_id: emailId,
+        confirm_send: confirmSend,
+        idempotency_key: idempotencyKey || null,
+      }),
+    }),
+
+  listEmailsForJob: (jobId: string) =>
+    apiClient<ApplicationEmail[]>(`/application-assistant/jobs/${jobId}/emails`),
+
+  generateQA: (data: {
+    job_id: string;
+    preparation_id?: string;
+    resume_version_id?: string;
+    custom_questions?: string[];
+  }) =>
+    apiClient<ApplicationQAResponse>("/application-assistant/qa/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
 
 
 

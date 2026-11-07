@@ -157,4 +157,3 @@ class RecommendationStateResponse(BaseModel):
     job_id: uuid.UUID
     is_saved: bool
     is_dismissed: bool
-

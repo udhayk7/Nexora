@@ -10,6 +10,7 @@ from app.models.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from app.models.analysis import ResumeAnalysis
     from app.models.application import JobApplication
+    from app.models.assistant import ApplicationPreparation, GmailConnection
     from app.models.company import Company
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
@@ -118,6 +119,17 @@ class User(Base, TimestampMixin):
     )
     ai_job_matches: Mapped[list["AIJobMatch"]] = relationship(
         "AIJobMatch",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    gmail_connection: Mapped[Optional["GmailConnection"]] = relationship(
+        "GmailConnection",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    application_preparations: Mapped[list["ApplicationPreparation"]] = relationship(
+        "ApplicationPreparation",
         back_populates="user",
         cascade="all, delete-orphan",
     )
