@@ -9,12 +9,14 @@ import hashlib
 import json
 import logging
 import re
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 from html.parser import HTMLParser
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
+from urllib.robotparser import RobotFileParser
 
 import httpx
 
@@ -33,17 +35,26 @@ DEFAULT_TIMEOUT_SECONDS = 8.0
 # Injection patterns to neutralize in untrusted web text
 _PROMPT_INJECTION_PATTERN = re.compile(
     r"(?i)(?:\b(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
-    r"disregard\s+(?:all\s+)?(?:previous|prior)\s+instructions)\b|"
-    r"system\s*prompt\s*:|<system>|<\/system>|\bassistant\s*:|\bhuman\s*:)"
+    r"disregard\s+(?:all\s+)?(?:previous|prior)\s+instructions|"
+    r"bypass\s+(?:all\s+)?(?:system|safety|security)\s+(?:rules|filters|prompts)|"
+    r"you\s+are\s+now\s+(?:an?\s+)?(?:unrestricted|dan|jailbroken|godmode)|"
+    r"reset\s+(?:all\s+)?(?:instructions|prompts|rules)|"
+    r"output\s+only\s+(?:'|\")?[a-zA-Z0-9_\-]+(?:'|\")?)\b|"
+    r"system\s*prompt\s*:?|<system>|<\/system>|"
+    r"\[(?:inst|\/inst)\]|<\/?UNTRUSTED[A-Z0-9_]*>|\bassistant\s*:|\bhuman\s*:)"
 )
 
 
 def sanitize_untrusted_content(text: str) -> str:
-    """Neutralize potential prompt-injection directives from third-party web content."""
+    """Neutralize potential prompt-injection directives and tag escapes."""
     if not text:
         return ""
-    # Defuse direct instructions without losing research context
+    # Defuse direct instructions without losing legitimate research context
     sanitized = _PROMPT_INJECTION_PATTERN.sub(r"[filtered-directive]", text)
+    # Neutralize closing container tag escapes
+    sanitized = sanitized.replace("</UNTRUSTED", "<_UNTRUSTED").replace(
+        "</untrusted", "<_untrusted"
+    )
     return re.sub(r"\s+", " ", sanitized).strip()
 
 
@@ -137,11 +148,149 @@ def is_official_domain(url: str, expected_domain: Optional[str]) -> bool:
     return act == exp or act.endswith(f".{exp}")
 
 
-class SSRFSafeFetcher:
-    """Hardened HTTP client enforcing SSRFSafeTransport, size caps, and redirect tracking."""
+# Anti-bot, challenge, and paywall markers that MUST NOT be bypassed
+_ANTI_BOT_MARKERS = [
+    b"challenge-platform",
+    b"cf-mitigated",
+    b"just a moment...",
+    b"cf-turnstile",
+    b"hcaptcha.com",
+    b"google.com/recaptcha",
+    b"g-recaptcha",
+    b"challenge-running",
+    b"access denied | www.cloudflare.com",
+    b"paywall-content",
+    b"subscription-required",
+]
 
-    def __init__(self, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> None:
+
+class RobotsPolicyEnforcer:
+    """Retrieves, parses, caches robots.txt policies, and enforces domain crawl rules.
+
+    Invariants enforced:
+    1. Retrieves and parses /robots.txt for each domain prior to crawling.
+    2. Respects user-agent directives (NexoraBot, fallback to *).
+    3. Caches robots.txt results for 1 hour to prevent redundant requests.
+    4. If robots.txt cannot be retrieved or policy cannot be safely established
+       (e.g., 401/403/5xx or network failure), crawling that domain is DISALLOWED.
+       HTTP 404 indicates no restrictions per standard conventions.
+    5. Enforces domain-level crawl rate limits and respects crawl-delay directives.
+    6. Does not bypass anti-bot, paywalls, or CAPTCHA protections.
+    """
+
+    def __init__(
+        self,
+        cache_ttl_seconds: float = 3600.0,
+        default_crawl_delay: float = 0.5,
+    ) -> None:
+        self.cache_ttl = cache_ttl_seconds
+        self.default_crawl_delay = default_crawl_delay
+        self.user_agent = "NexoraBot"
+        self._cache: dict[str, tuple[Optional[RobotFileParser], str, float]] = {}
+        self._last_request_time: dict[str, float] = {}
+
+    def get_domain_key(self, url: str) -> str:
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}".lower()
+
+    def can_crawl(
+        self,
+        url: str,
+        fetcher: "SSRFSafeFetcher",
+    ) -> tuple[bool, str]:
+        domain_key = self.get_domain_key(url)
+        if not domain_key:
+            return False, "invalid_domain"
+
+        now = time.time()
+        cached = self._cache.get(domain_key)
+
+        if not cached or (now - cached[2]) > self.cache_ttl:
+            robots_url = urljoin(domain_key, "/robots.txt")
+            res = fetcher.fetch_raw_internal(robots_url)
+
+            if res is None or res.status_code in (401, 403) or res.status_code >= 500:
+                reason = (
+                    f"robots_fetch_failed: HTTP {res.status_code}"
+                    if res
+                    else "robots_fetch_failed: network_error_or_timeout"
+                )
+                self._cache[domain_key] = (None, "robots_fetch_failed", now)
+                logger.warning(
+                    "robots.txt for %s could not be retrieved (%s). Crawling disallowed.",
+                    domain_key,
+                    reason,
+                )
+                return False, reason
+            elif res.status_code == 404:
+                # Standard convention: 404 means no crawl restrictions
+                self._cache[domain_key] = (None, "allow_all_404", now)
+                cached = self._cache[domain_key]
+            elif res.status_code == 200:
+                try:
+                    robots_text = res.content_bytes.decode("utf-8", errors="replace")
+                    rp = RobotFileParser()
+                    rp.parse(robots_text.splitlines())
+                    self._cache[domain_key] = (rp, "parsed", now)
+                    cached = self._cache[domain_key]
+                except Exception as exc:
+                    self._cache[domain_key] = (None, "robots_parse_failed", now)
+                    return False, f"robots_parse_failed: {exc}"
+            else:
+                self._cache[domain_key] = (None, "robots_fetch_failed", now)
+                return False, f"robots_fetch_failed: HTTP {res.status_code}"
+
+        parser, status, _ = self._cache[domain_key]
+        if status == "robots_fetch_failed":
+            return False, "robots_fetch_failed: policy cannot be safely established"
+        if status == "allow_all_404" or parser is None:
+            return True, "allow_all_404"
+
+        # Check user-agent directive (NexoraBot, falls back to * if no specific entry)
+        allowed = parser.can_fetch(self.user_agent, url)
+        if not allowed:
+            logger.info("URL %s disallowed by robots.txt for user-agent %s", url, self.user_agent)
+            return False, f"disallowed_by_robots_txt: path blocked for {self.user_agent}"
+
+        return True, "allowed_by_robots_txt"
+
+    def apply_rate_limit(self, url: str) -> None:
+        domain_key = self.get_domain_key(url)
+        if not domain_key:
+            return
+
+        now = time.time()
+        last_time = self._last_request_time.get(domain_key, 0.0)
+
+        delay = self.default_crawl_delay
+        cached = self._cache.get(domain_key)
+        if cached and cached[0]:
+            try:
+                cd_val = cached[0].crawl_delay(self.user_agent) or cached[0].crawl_delay("*")
+                if cd_val is not None:
+                    parsed_cd = float(cd_val)
+                    if parsed_cd > 0:
+                        delay = min(parsed_cd, 2.0)
+            except Exception:
+                pass
+
+        elapsed = now - last_time
+        if elapsed < delay:
+            time.sleep(delay - elapsed)
+
+        self._last_request_time[domain_key] = time.time()
+
+
+class SSRFSafeFetcher:
+    """Hardened HTTP client enforcing SSRFSafeTransport, size caps, and robots policy."""
+
+    def __init__(
+        self,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        robots_enforcer: Optional[RobotsPolicyEnforcer] = None,
+    ) -> None:
         self.timeout = timeout_seconds
+        self.robots_enforcer = robots_enforcer or RobotsPolicyEnforcer()
         self.headers = {
             "User-Agent": (
                 "NexoraBot/1.0 (+https://nexora.career/bot; legitimate public career research)"
@@ -151,8 +300,8 @@ class SSRFSafeFetcher:
             ),
         }
 
-    def fetch(self, raw_url: str) -> Optional[FetchResult]:
-        """Fetch URL with connection-time IP validation and response size limits."""
+    def fetch_raw_internal(self, raw_url: str) -> Optional[FetchResult]:
+        """Low-level fetch implementing SSRF validation, IP pinning, and size caps."""
         if not raw_url:
             return None
 
@@ -175,48 +324,104 @@ class SSRFSafeFetcher:
                 ) as client,
                 client.stream("GET", validated_url) as response,
             ):
-                    if response.status_code >= 400:
-                        logger.warning(
-                            "Source %s returned HTTP %d", validated_url, response.status_code
-                        )
-                        return None
-
-                    final_url_str = str(response.url)
-                    # Re-validate final URL destination
-                    try:
-                        validate_safe_url(final_url_str, field_name="Redirect Destination")
-                    except Exception as exc:
-                        logger.warning(
-                            "Blocked redirect to unsafe target %s: %s", final_url_str, exc
-                        )
-                        return None
-
-                    chunks = []
-                    total_bytes = 0
-                    for chunk in response.iter_bytes(chunk_size=8192):
-                        chunks.append(chunk)
-                        total_bytes += len(chunk)
-                        if total_bytes > MAX_RESPONSE_BYTES:
-                            logger.warning(
-                                "Response from %s exceeded size limit (%d bytes), truncating",
-                                validated_url,
-                                MAX_RESPONSE_BYTES,
-                            )
-                            break
-
-                    content_type = response.headers.get("content-type", "").lower()
+                if response.status_code == 404:
+                    return FetchResult(
+                        status_code=404,
+                        source_url=validated_url,
+                        final_url=str(response.url),
+                        content_bytes=b"",
+                        content_type="",
+                    )
+                if response.status_code >= 400:
+                    logger.warning(
+                        "Source %s returned HTTP %d", validated_url, response.status_code
+                    )
                     return FetchResult(
                         status_code=response.status_code,
                         source_url=validated_url,
-                        final_url=final_url_str,
-                        content_bytes=b"".join(chunks),
-                        content_type=content_type,
-                        headers=dict(response.headers),
+                        final_url=str(response.url),
+                        content_bytes=b"",
+                        content_type="",
                     )
+
+                final_url_str = str(response.url)
+                # Re-validate final URL destination
+                try:
+                    validate_safe_url(final_url_str, field_name="Redirect Destination")
+                except Exception as exc:
+                    logger.warning("Blocked redirect to unsafe target %s: %s", final_url_str, exc)
+                    return None
+
+                # Check anti-bot response headers
+                if response.headers.get("cf-mitigated") == "challenge":
+                    logger.warning(
+                        "Cloudflare anti-bot challenge on %s; cannot bypass. Aborting.",
+                        validated_url,
+                    )
+                    return None
+
+                chunks = []
+                total_bytes = 0
+                for chunk in response.iter_bytes(chunk_size=8192):
+                    chunks.append(chunk)
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_RESPONSE_BYTES:
+                        logger.warning(
+                            "Response from %s exceeded size limit (%d bytes), truncating",
+                            validated_url,
+                            MAX_RESPONSE_BYTES,
+                        )
+                        break
+
+                content_bytes = b"".join(chunks)
+
+                # Check anti-bot / challenge / paywall markers in body
+                content_lower = content_bytes.lower()
+                for marker in _ANTI_BOT_MARKERS:
+                    if marker in content_lower:
+                        logger.warning(
+                            "Anti-bot/challenge detected on %s; bypass prohibited. Aborting.",
+                            validated_url,
+                        )
+                        return None
+
+                content_type = response.headers.get("content-type", "").lower()
+                return FetchResult(
+                    status_code=response.status_code,
+                    source_url=validated_url,
+                    final_url=final_url_str,
+                    content_bytes=content_bytes,
+                    content_type=content_type,
+                    headers=dict(response.headers),
+                )
 
         except Exception as exc:
             logger.warning("Failed to fetch public research source %s: %s", validated_url, exc)
             return None
+
+    def is_anti_bot_blocked(self, res: Optional[FetchResult]) -> bool:
+        """Detect anti-bot, challenge gates, and paywall markers."""
+        if not res or not res.content_bytes:
+            return False
+        content_lower = res.content_bytes.lower()
+        return any(marker in content_lower for marker in _ANTI_BOT_MARKERS)
+
+    def fetch(self, raw_url: str, check_robots: bool = True) -> Optional[FetchResult]:
+        """Fetch URL with robots.txt policy enforcement, domain rate limits, and SSRF defense."""
+        if not raw_url:
+            return None
+
+        if check_robots:
+            allowed, reason = self.robots_enforcer.can_crawl(raw_url, self)
+            if not allowed:
+                logger.info("Crawl blocked for %s: %s", raw_url, reason)
+                return None
+            self.robots_enforcer.apply_rate_limit(raw_url)
+
+        res = self.fetch_raw_internal(raw_url)
+        if res and (res.status_code >= 400 or self.is_anti_bot_blocked(res)):
+            return None
+        return res
 
 
 # ============================================================================
@@ -664,6 +869,16 @@ class CompanyResearchCoordinator:
         """Discover and fetch public research evidence across all 6 categories."""
         results: list[ResearchSourcePayload] = []
         seen_hashes: set[str] = set()
+        visited_urls: set[str] = set()
+
+        def should_crawl(url_to_check: Optional[str]) -> bool:
+            if not url_to_check:
+                return False
+            normalized = url_to_check.strip().rstrip("/").lower()
+            if normalized in visited_urls:
+                return False
+            visited_urls.add(normalized)
+            return True
 
         def add_payload(p: Optional[ResearchSourcePayload]) -> None:
             if p and p.content_hash not in seen_hashes:
@@ -675,7 +890,7 @@ class CompanyResearchCoordinator:
                 add_payload(p)
 
         # 1. Official Website (Homepage & About)
-        if website_url:
+        if website_url and should_crawl(website_url):
             p_home = self.website_adapter.fetch_page(
                 website_url,
                 source_type="official_website",
@@ -684,18 +899,20 @@ class CompanyResearchCoordinator:
             )
             add_payload(p_home)
 
+        if website_url:
             # Discover /about
             about_url = urljoin(website_url, "/about")
-            p_about = self.website_adapter.fetch_page(
-                about_url,
-                source_type="official_website",
-                expected_domain=expected_domain,
-                company_is_verified=company_is_verified,
-            )
-            add_payload(p_about)
+            if should_crawl(about_url):
+                p_about = self.website_adapter.fetch_page(
+                    about_url,
+                    source_type="official_website",
+                    expected_domain=expected_domain,
+                    company_is_verified=company_is_verified,
+                )
+                add_payload(p_about)
 
         # 2. Careers Page
-        if careers_url:
+        if careers_url and should_crawl(careers_url):
             p_careers = self.website_adapter.fetch_page(
                 careers_url,
                 source_type="careers_page",
@@ -714,7 +931,7 @@ class CompanyResearchCoordinator:
         if not newsroom_url and website_url:
             newsroom_url = urljoin(website_url, "/news")
 
-        if newsroom_url:
+        if newsroom_url and should_crawl(newsroom_url):
             p_news = self.newsroom_adapter.fetch_newsroom(
                 newsroom_url,
                 expected_domain=expected_domain,
@@ -732,7 +949,7 @@ class CompanyResearchCoordinator:
         if not blog_url and website_url:
             blog_url = urljoin(website_url, "/blog")
 
-        if blog_url:
+        if blog_url and should_crawl(blog_url):
             p_blog = self.blog_adapter.fetch_engineering_blog(
                 blog_url,
                 expected_domain=expected_domain,
@@ -750,7 +967,7 @@ class CompanyResearchCoordinator:
         if not ir_url and website_url:
             ir_url = urljoin(website_url, "/investors")
 
-        if ir_url:
+        if ir_url and should_crawl(ir_url):
             p_ir = self.ir_adapter.fetch_investor_relations(
                 ir_url,
                 expected_domain=expected_domain,
@@ -763,7 +980,7 @@ class CompanyResearchCoordinator:
             for s in configured_sources:
                 stype = s.get("source_type", "")
                 surl = s.get("source_url") or s.get("url", "")
-                if not surl:
+                if not surl or not should_crawl(surl):
                     continue
 
                 if stype in ("rss", "atom", "xml_feed", "rss_feed", "public_feed"):

@@ -57,16 +57,20 @@ Nexora is an AI-powered career discovery and application management platform des
 - Automated preparation reminder alarms integrated into existing `NotificationService` and Celery infrastructure.
 - Direct shortcut from Application Tracker interview rounds without automatically modifying application status.
 
-### 8. Company Intelligence & Employer Research (Completed — Prompt 17 & 17 Audit)
+### 8. Company Intelligence & Employer Research (Completed — Prompt 17, 17 Audit & Security Validation)
 - Evidence-backed company intelligence profiles covering overview, industry domain, operating locations, products/services, size, and funding without fabrication.
 - 6 genuinely supported public research source categories: official websites, company newsrooms, engineering blogs, investor relations, permitted public RSS/Atom feeds, and permitted public JSON feeds.
 - Source verification semantics: sources are only verified (`is_verified=True`) when their final destination matches the company's verified official domain.
 - Technology stack evidence integrity: confirmed technologies require direct verified official source documentation; unverified sources or single job postings classify as inferred.
-- Hardened SSRF and content security: connection-time IP pinning (`SSRFSafeTransport`), multi-hop redirect destination validation, 2MB streaming cap against decompression bombs, and prompt-injection neutralization (`sanitize_untrusted_content`).
+- Hardened SSRF and content security: connection-time IP pinning (`SSRFSafeTransport`), multi-hop redirect destination validation, and 2MB streaming cap against decompression bombs.
+- Automated `robots.txt` and crawl policy enforcement (`RobotsPolicyEnforcer`): user-agent evaluation (`NexoraBot` with fallback to `*`), 1-hour cache, strict disallow when policy cannot be established (401/403/5xx/timeout), 404 allow-all, per-domain rate limiting honoring `Crawl-delay`, and crawl session request deduplication.
+- Strict non-bypass of authentication, paywalls, CAPTCHA, or anti-bot protections (Cloudflare Turnstile, challenge platforms); immediately aborts and logs diagnostic reason.
+- Structural prompt-injection defense: `<UNTRUSTED_EXTERNAL_EVIDENCE_CATALOG>`, `<PASSIVE_EXCERPT>`, strict per-snippet (800 chars) and total payload (4,000 chars) caps, directive defusal (`sanitize_untrusted_content`), tag breakout neutralization (`</UNTRUSTED` -> `<_UNTRUSTED`), and explicit model instruction execution immunity invariants.
+- 10-endpoint authorization audit: strict tenant isolation across report generation, detail retrieval, listing, deletion, and candidate-fit endpoints; shared company data endpoints return zero candidate-specific information.
 - Grounded hiring intelligence strictly computed from active discovered DB jobs (entry-level, internships, categories, locations).
 - Candidate-to-company fit assessment evaluating overlapping skills, flagged gap areas, role alignments, and customized interview preparation advice with strict resume-version ownership validation.
 - Structured 10-section AI research reports (`company_research_reports`) with deterministic SHA-256 caching (incorporating job fingerprints), stale cache invalidation, and owner-isolated report deletion (`DELETE /company-intelligence/reports/{id}`).
-- Documented limitations: complies strictly with robots.txt and terms of service; no unauthorized scraping behind authentication gates, paywalls, or anti-bot challenges.
+- Documented boundaries: Nexora enforces crawling and content safety invariants; users are responsible for supplying legitimate public URLs and must not input gated or proprietary links.
 - Dedicated frontend workspace (`/dashboard/company-intelligence`) with company search, technology breakdown, hiring trends, candidate fit, report viewer with deletion, and public source provenance viewer with redirect badges.
 - Integrated shortcuts from Company Discovery and Job Discovery cards.
 

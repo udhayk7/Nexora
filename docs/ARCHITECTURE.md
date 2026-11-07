@@ -643,10 +643,22 @@ The `CompanyResearchCoordinator` coordinates public evidence discovery and colle
 5. **Permitted Public RSS/Atom Feeds**: `RSSFeedAdapter` safely parses RSS 2.0 and Atom feeds, blocking DTD/entity expansion (XXE protection).
 6. **Permitted Public JSON Feeds**: `JSONFeedAdapter` parses standard JSON Feed 1.1 streams.
 
-### 21.4 Content Security & Threat Defense
+### 21.4 Content Security & Crawl Policy Defense
+- **Automated Robots.txt Enforcement (`RobotsPolicyEnforcer`)**:
+  - Automatically fetches, parses, and caches `robots.txt` per domain (1-hour TTL).
+  - Evaluates explicit user-agent directives for `NexoraBot` before falling back to `*`.
+  - **Strict Disallow on Policy Failure**: If `robots.txt` cannot be retrieved or policy cannot be safely established due to HTTP 401, 403, 5xx, or network timeouts, Nexora halts the crawl and logs the failure. Only HTTP 404 (absence of policy) defaults to permitted crawling.
+  - **Per-Domain Rate Limiting**: Honors `Crawl-delay` directives up to 2.0 seconds with a default 0.5-second pacing floor.
+  - **Request Deduplication**: Tracks visited URLs in memory per crawl session to eliminate duplicate requests.
+  - **Anti-Bot & Paywall Non-Bypass**: Detects Cloudflare Turnstile, CAPTCHAs, challenge scripts (`cf-mitigated`, `challenge-platform`, `just a moment...`), and paywalls. Never bypasses authentication, paywalls, or anti-bot protections; halts immediately and records diagnostic reason.
+  - **Division of Responsibility**: Nexora guarantees strict robots.txt compliance, SSRF protection, size caps, rate limiting, and prompt-injection neutralization. Users remain responsible for configuring legitimate public URLs and must not supply credentials or proprietary intranet URLs.
 - **Connection-Time IP Pinning (`SSRFSafeTransport`)**: Resolves hostnames and verifies socket destination IPs immediately prior to TCP handshake, defeating DNS rebinding attacks.
 - **Decompression Bomb Protection**: Streams responses chunk by chunk and halts at 2MB (`MAX_RESPONSE_BYTES`).
-- **Prompt Injection Neutralization**: `sanitize_untrusted_content` strips and filters instruction-override patterns (`ignore previous instructions`, `system prompt:`, `assistant:`, etc.) from scraped HTML and feed text before passing to LLM prompts.
+- **Prompt Injection Neutralization & Untrusted Enclosure**:
+  - `sanitize_untrusted_content` strips and filters instruction-override patterns (`ignore previous instructions`, `system prompt:`, `assistant:`, `you are now DAN`, etc.) and defuses container closing tags (`</UNTRUSTED` -> `<_UNTRUSTED`).
+  - LLM prompt constructs `<UNTRUSTED_EXTERNAL_EVIDENCE_CATALOG>` with isolated `<EVIDENCE_ITEM>` and `<PASSIVE_EXCERPT>` wrappers.
+  - Caps individual source snippets at 800 characters and aggregate catalog payload at 4,000 characters.
+  - System instructions enforce strict immunity invariants: the model is barred from following directives, changing roles, revealing secrets/prompts, or invoking tools regardless of content inside source excerpts.
 - **Multi-Hop Redirect Validation**: Validates each redirect hop URL against scheme and hostname policies.
 
 ### 21.5 10-Section AI Research Dossier
@@ -661,6 +673,22 @@ The `CompanyResearchCoordinator` coordinates public evidence discovery and colle
   8. `interview_prep_topics`: Recommended interview preparation topics
   9. `recruiter_interviewer_questions`: Thoughtful questions to ask recruiters and interviewers
   10. `sources_and_evidence`: Sources and evidence summary with verification and provenance citations
+
+### 21.6 Authorization & Tenant Isolation Matrix
+The Company Intelligence module separates shared organizational research from candidate-specific private data across all 10 endpoints:
+
+| Endpoint | Access Level | Tenant Isolation & Security Control |
+|---|---|---|
+| `GET /api/v1/companies/{id}/intelligence` | Authenticated | Shared organizational intelligence. Returns zero candidate data. |
+| `GET /api/v1/companies/{id}/technology` | Authenticated | Shared tech stack with 4-tier provenance. No candidate data. |
+| `GET /api/v1/companies/{id}/hiring` | Authenticated | Aggregated from public job records. No candidate data. |
+| `GET /api/v1/companies/{id}/sources` | Authenticated | Verified public citation documents. No candidate data. |
+| `GET /api/v1/companies/{id}/fit` | Authenticated User | Candidate-specific. Requires `resume_version_id` owned by the requesting user; returns 404 on cross-user substitution. |
+| `POST /api/v1/companies/{id}/research/generate` | Authenticated User | Candidate-specific. Validates user ownership of `resume_version_id`. Generates report owned strictly by `current_user.id`. |
+| `GET /api/v1/companies/{id}/research/reports` | Authenticated User | Filters `CompanyResearchReport.user_id == current_user.id`. User B cannot see User A's reports. |
+| `GET /api/v1/company-intelligence/reports` | Authenticated User | Filters `CompanyResearchReport.user_id == current_user.id`. |
+| `GET /api/v1/company-intelligence/reports/{id}` | Authenticated User | Returns report only if `report.user_id == current_user.id`; returns 404 otherwise. |
+| `DELETE /api/v1/company-intelligence/reports/{id}` | Authenticated User | Deletes report only if `report.user_id == current_user.id`; returns 404 otherwise. |
 
 ---
 
