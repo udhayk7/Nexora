@@ -86,6 +86,19 @@ Nexora is an AI-powered career discovery and application management platform des
 - Authenticated REST API endpoints mounted under `/api/v1/career-command-center/*` with strict multi-tenant user isolation and flexible date filtering (`30d`, `90d`, `all`).
 - Direct quick-launch dashboard card on `/dashboard` hub.
 
+### 10. Personalized Skill Development & Learning Roadmaps (Completed — Prompt 19)
+- Personalized skill gap analysis synthesizing resume evidence, job market demand frequency, interview weaknesses, and target roles with deterministic priority scores ($0-100$) and tiers (`critical`, `high`, `medium`, `low`).
+- Zero-fabrication boundary: never claims a candidate possesses a technical skill without supporting resume evidence or verified project artifacts.
+- 4-Stage learning roadmaps (`Beginner` $\to$ `Intermediate` $\to$ `Advanced` $\to$ `Portfolio`) across 6 core technical tracks (`backend_python`, `fullstack`, `ai_ml`, `genai`, `data_analyst`, `sde`) adapted to candidate's demonstrated skills with automated prerequisite satisfaction.
+- Deterministic template engine paired with AI provider abstraction (Gemini / OpenAI) with reliable rule-based fallback.
+- Curated public educational resource catalog (Python Docs, FastAPI, React, MDN, PostgreSQL, Docker, Redis, FreeCodeCamp, Google Cloud Skills Boost, Microsoft Learn, AWS Skill Builder, Coursera) with verified URLs, difficulty levels, and cost tiers, plus custom candidate bookmarks.
+- Interactive milestone progression and practical hands-on exercises checklist with hourly study velocity tracking.
+- Curated and AI-recommended practical portfolio projects with functional requirements, suggested tech stacks, milestones, and expected portfolio outcomes.
+- Strict resume integration policy: completing courses/lessons never modifies resumes automatically; completed projects require explicit candidate review, repository link verification, and architectural description before becoming resume evidence.
+- Multi-tenant database architecture (`LearningRoadmap`, `LearningMilestone`, `LearningResource`, `LearningProject`, `LearningActivity`) with UUID keys, foreign key constraints, and user isolation.
+- 16 REST API endpoints mounted under `/api/v1/learning-roadmaps/*`.
+- Full SaaS UI workspace at `/dashboard/learning-roadmap` with Skill Gaps, Roadmaps, Resources, Projects, and Analytics tabs, plus quick-launch card on the main dashboard.
+
 ---
 
 ## Non-Functional Requirements

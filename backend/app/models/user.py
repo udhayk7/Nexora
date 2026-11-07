@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         InterviewPreparationSession,
     )
     from app.models.job import Job
+    from app.models.learning_roadmap import LearningProject, LearningRoadmap
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.notification import Notification, UserNotificationPreference
     from app.models.recommendation import AIJobMatch
@@ -150,6 +151,16 @@ class User(Base, TimestampMixin):
     )
     company_research_reports: Mapped[list["CompanyResearchReport"]] = relationship(
         "CompanyResearchReport",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    learning_roadmaps: Mapped[list["LearningRoadmap"]] = relationship(
+        "LearningRoadmap",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    learning_projects: Mapped[list["LearningProject"]] = relationship(
+        "LearningProject",
         back_populates="user",
         cascade="all, delete-orphan",
     )

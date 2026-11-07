@@ -28,6 +28,13 @@ from app.models.interview_prep import (
     InterviewQuestion,
 )
 from app.models.job import Job, JobSource, JobVerification
+from app.models.learning_roadmap import (
+    LearningActivity,
+    LearningMilestone,
+    LearningProject,
+    LearningResource,
+    LearningRoadmap,
+)
 from app.models.match import JobMatch, UserMatchingPreference
 from app.models.notification import Notification, UserNotificationPreference
 from app.models.recommendation import AIJobMatch, JobIntelligence
@@ -73,4 +80,9 @@ __all__ = [
     "InterviewAnswer",
     "InterviewEvaluation",
     "InterviewPreparationNote",
+    "LearningRoadmap",
+    "LearningMilestone",
+    "LearningResource",
+    "LearningProject",
+    "LearningActivity",
 ]

@@ -2865,6 +2865,308 @@ export const careerCommandCenterApi = {
     }),
 };
 
+// ============================================================================
+// 23. LEARNING ROADMAPS & SKILL DEVELOPMENT TYPES & API (PROMPT 19)
+// ============================================================================
+
+export interface SkillItem {
+  skill: string;
+  category: string;
+  priority_tier: "critical" | "high" | "medium" | "low";
+  priority_score: number;
+  market_demand_frequency: number;
+  is_target_role_skill: boolean;
+  is_interview_weakness: boolean;
+  evidence_notes?: string | null;
+}
+
+export interface SkillGapAnalysisResponse {
+  candidate_id: string;
+  target_role: string;
+  demonstrated_skills: SkillItem[];
+  partially_demonstrated_skills: SkillItem[];
+  missing_skills: SkillItem[];
+  interview_weaknesses: SkillItem[];
+  target_roles: string[];
+  total_demonstrated: number;
+  total_gaps: number;
+  recommendation_summary: string;
+}
+
+export interface LearningResource {
+  id: string;
+  skill: string;
+  title: string;
+  provider: string;
+  url: string;
+  cost_tier: string;
+  resource_type: string;
+  difficulty: string;
+  estimated_hours?: number | null;
+  description?: string | null;
+  is_verified: boolean;
+  is_curated: boolean;
+  is_bookmarked?: boolean;
+  created_at?: string;
+}
+
+export interface PracticalExercise {
+  title: string;
+  instructions: string;
+  estimated_minutes: number;
+  completed: boolean;
+}
+
+export interface LearningMilestone {
+  id: string;
+  roadmap_id: string;
+  title: string;
+  stage: string;
+  description?: string | null;
+  learning_objectives: string[];
+  practical_exercises: PracticalExercise[];
+  status: string;
+  estimated_hours: number;
+  completed_hours: number;
+  order_index: number;
+  completion_notes?: string | null;
+  completed_at?: string | null;
+}
+
+export interface RoadmapPrerequisite {
+  topic: string;
+  required: boolean;
+  is_satisfied: boolean;
+  evidence?: string | null;
+}
+
+export interface LearningRoadmap {
+  id: string;
+  title: string;
+  target_role: string;
+  description?: string | null;
+  target_skills: string[];
+  status: string;
+  difficulty_level: string;
+  total_estimated_hours: number;
+  completed_hours: number;
+  completion_percentage: number;
+  prerequisites: RoadmapPrerequisite[];
+  already_mastered_skills: string[];
+  milestones: LearningMilestone[];
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface LearningRoadmapSummary {
+  id: string;
+  title: string;
+  target_role: string;
+  target_skills: string[];
+  status: string;
+  difficulty_level: string;
+  total_estimated_hours: number;
+  completed_hours: number;
+  completion_percentage: number;
+  milestones_count: number;
+  completed_milestones_count: number;
+  created_at: string;
+}
+
+export interface SuggestedMilestone {
+  title: string;
+  description: string;
+  estimated_hours: number;
+}
+
+export interface LearningProject {
+  id: string;
+  title: string;
+  objective: string;
+  summary?: string | null;
+  target_skills: string[];
+  functional_requirements: string[];
+  tech_stack: string[];
+  suggested_milestones: SuggestedMilestone[];
+  expected_portfolio_outcome?: string | null;
+  resume_bullet_sample?: string | null;
+  status: string;
+  repository_url?: string | null;
+  live_demo_url?: string | null;
+  architecture_overview?: string | null;
+  is_portfolio_ready: boolean;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface LearningActivity {
+  id: string;
+  activity_type: string;
+  skill?: string | null;
+  duration_hours: number;
+  notes?: string | null;
+  logged_at: string;
+}
+
+export interface LearningAnalytics {
+  total_hours_learned: number;
+  weekly_hours_learned: number;
+  active_roadmaps_count: number;
+  completed_milestones_count: number;
+  portfolio_projects_count: number;
+  skills_in_progress: string[];
+  hours_by_skill: Record<string, number>;
+  recent_activities: LearningActivity[];
+}
+
+export const learningRoadmapsApi = {
+  getSkillGaps: () =>
+    apiClient<SkillGapAnalysisResponse>("/learning-roadmaps/skill-gaps"),
+
+  getAnalytics: () =>
+    apiClient<LearningAnalytics>("/learning-roadmaps/analytics"),
+
+  listRoadmaps: (status?: string) =>
+    apiClient<LearningRoadmapSummary[]>(
+      `/learning-roadmaps${status ? `?status=${encodeURIComponent(status)}` : ""}`
+    ),
+
+  getRoadmap: (id: string) =>
+    apiClient<LearningRoadmap>(`/learning-roadmaps/${id}`),
+
+  createRoadmap: (data: {
+    target_role: string;
+    custom_skills?: string[];
+    target_difficulty?: string;
+    user_notes?: string;
+  }) =>
+    apiClient<LearningRoadmap>("/learning-roadmaps", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateRoadmapStatus: (id: string, status: string) =>
+    apiClient<LearningRoadmap>(`/learning-roadmaps/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  deleteRoadmap: (id: string) =>
+    apiClient<{ status: string; message: string }>(`/learning-roadmaps/${id}`, {
+      method: "DELETE",
+    }),
+
+  updateMilestone: (
+    id: string,
+    data: {
+      status?: string;
+      completed_hours?: number;
+      completion_notes?: string;
+      practical_exercises?: PracticalExercise[];
+    }
+  ) =>
+    apiClient<LearningMilestone>(`/learning-roadmaps/milestones/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  listResources: (params?: { skill?: string; difficulty?: string; cost_tier?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.skill) q.set("skill", params.skill);
+    if (params?.difficulty) q.set("difficulty", params.difficulty);
+    if (params?.cost_tier) q.set("cost_tier", params.cost_tier);
+    const qs = q.toString();
+    return apiClient<LearningResource[]>(
+      `/learning-roadmaps/resources/catalog${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  createCustomResource: (data: {
+    skill: string;
+    title: string;
+    provider: string;
+    url: string;
+    cost_tier?: string;
+    resource_type?: string;
+    difficulty?: string;
+    estimated_hours?: number;
+    description?: string;
+  }) =>
+    apiClient<LearningResource>("/learning-roadmaps/resources/custom", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  deleteCustomResource: (id: string) =>
+    apiClient<{ status: string; message: string }>(
+      `/learning-roadmaps/resources/custom/${id}`,
+      { method: "DELETE" }
+    ),
+
+  logActivity: (data: {
+    activity_type: string;
+    duration_hours: number;
+    skill?: string;
+    notes?: string;
+    milestone_id?: string;
+    roadmap_id?: string;
+  }) =>
+    apiClient<LearningActivity>("/learning-roadmaps/activities", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listActivities: (limit = 20) =>
+    apiClient<LearningActivity[]>(`/learning-roadmaps/activities?limit=${limit}`),
+
+  getProjectRecommendations: (params?: { target_role?: string; missing_skills?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.target_role) q.set("target_role", params.target_role);
+    if (params?.missing_skills) q.set("missing_skills", params.missing_skills);
+    const qs = q.toString();
+    return apiClient<any[]>(
+      `/learning-roadmaps/projects/recommendations${qs ? `?${qs}` : ""}`
+    );
+  },
+
+  listProjects: (status?: string) =>
+    apiClient<LearningProject[]>(
+      `/learning-roadmaps/projects${status ? `?status=${encodeURIComponent(status)}` : ""}`
+    ),
+
+  createProject: (data: {
+    title: string;
+    objective: string;
+    summary?: string;
+    target_skills: string[];
+    functional_requirements?: string[];
+    tech_stack?: string[];
+    suggested_milestones?: SuggestedMilestone[];
+    expected_portfolio_outcome?: string;
+    resume_bullet_sample?: string;
+  }) =>
+    apiClient<LearningProject>("/learning-roadmaps/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateProject: (
+    id: string,
+    data: {
+      status?: string;
+      repository_url?: string;
+      live_demo_url?: string;
+      architecture_overview?: string;
+      is_portfolio_ready?: boolean;
+    }
+  ) =>
+    apiClient<LearningProject>(`/learning-roadmaps/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+};
+
+
 
 
 

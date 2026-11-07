@@ -778,3 +778,72 @@ All endpoints mounted under `/api/v1/career-command-center` and require standard
 - `GET /api/v1/career-command-center/goals`: Target roles, priority skills, locations, salary, and weekly application target.
 - `PUT /api/v1/career-command-center/goals`: Updates user career goals and matching preferences atomically.
 
+---
+
+## 23. Personalized Skill Development & Learning Roadmaps (Prompt 19)
+
+### 23.1 Objectives & Anti-Fabrication Principles
+The Skill Development module synthesizes demonstrated resume evidence, job market demand, interview weaknesses, and target roles into personalized 4-stage learning roadmaps, practical hands-on exercises, curated educational resources, and portfolio project tracking.
+
+**Strict Anti-Fabrication Boundaries**:
+1. **Evidence-Grounded Skill Possession**: The platform never asserts a candidate possesses a technical skill without verified resume or project evidence.
+2. **Decoupled Resume Modification**: Completing lessons or exercises never modifies the user's resume automatically. Completed portfolio projects require explicit user review, repository link verification, and architectural evidence submission before becoming eligible for resume integration.
+
+### 23.2 Architecture & Service Pipeline
+```
+[User Resume & Target Jobs] ───► [Skill Gap Analyzer]
+                                       │ (Categorizes: Demonstrated, Partial, Missing, Weakness)
+                                       ▼
+                         [Roadmap Generation Engine]
+                                       ├── Multi-track Deterministic Templates (6 tracks)
+                                       │   └── Adapts beginner stage based on verified skills
+                                       └── AI Provider Abstraction (Gemini / OpenAI fallback)
+                                       │
+                                       ▼
+                       [Learning Roadmaps & Milestones]
+                                       ├── 4 Stages (Beginner -> Intermediate -> Advanced -> Portfolio)
+                                       ├── Practical Hands-On Exercises & Time Estimates
+                                       ├── Curated Verified Resources Catalog + Custom Bookmarks
+                                       ├── Project Portfolio Tracker (Architecture & Repo URL)
+                                       └── Activity Velocity & Study Time Analytics
+```
+
+### 23.3 Database Models (`app/models/learning_roadmap.py`)
+- `learning_roadmaps`: Multi-tenant roadmap entity storing target role, target skills, difficulty tier, status (`active`, `paused`, `completed`, `archived`), total hours, completed hours, prerequisites JSON, already mastered skills JSON, and metadata.
+- `learning_milestones`: 4 stages per roadmap (`beginner`, `intermediate`, `advanced`, `portfolio`), learning objectives list, practical exercises checklist with individual completion flags, estimated hours, and completion notes.
+- `learning_resources`: Curated and custom educational bookmarks with verified external URLs, provider name, cost tier (`free`, `freemium`, `paid`), difficulty, and skill tags.
+- `learning_projects`: Tracked practical portfolio projects with functional requirements, tech stack, milestones, repository URL, live demo URL, architecture evidence notes, and portfolio readiness flag.
+- `learning_activities`: Granular study session log (`reading`, `coding`, `exercise`, `project_work`, `review`, `practice`), duration in hours, skill tag, and session notes.
+
+### 23.4 Deterministic Roadmap Tracks & AI Provider Fallback
+Supports 6 comprehensive technical tracks:
+1. `backend_python`: Python, FastAPI, PostgreSQL, Docker, Redis, Celery, REST API architecture.
+2. `fullstack`: React, Next.js, TypeScript, Tailwind CSS, Python/FastAPI backend, deployment.
+3. `ai_ml`: NumPy, Pandas, Scikit-Learn, PyTorch, model evaluation, inference serving.
+4. `genai`: Prompt Engineering, Gemini API, RAG, Vector Databases, LangChain, LLM safety.
+5. `data_analyst`: Advanced SQL, PostgreSQL aggregation, Pandas, Metabase/Streamlit dashboards.
+6. `sde`: Data Structures & Algorithms, Big-O, System Design, clean OOP design patterns.
+
+When candidates possess verified resume skills matching a track's beginner topics, the engine automatically flags prerequisite satisfaction and completes foundational exercises so candidates skip redundant beginner material.
+
+### 23.5 REST API Endpoints
+All endpoints mounted under `/api/v1/learning-roadmaps` with multi-tenant user authentication:
+- `GET /api/v1/learning-roadmaps/skill-gaps`: Synthesizes demonstrated, partial, missing, and interview weakness skills with deterministic priority scores ($0-100$).
+- `GET /api/v1/learning-roadmaps/analytics`: Study velocity, total hours learned, weekly velocity, and hours-by-skill distribution.
+- `GET /api/v1/learning-roadmaps/resources/catalog`: Explores curated public educational resources with filters for skill, difficulty, and cost tier.
+- `POST /api/v1/learning-roadmaps/resources/custom`: Saves user custom resource bookmarks.
+- `DELETE /api/v1/learning-roadmaps/resources/custom/{id}`: Deletes custom bookmark.
+- `POST /api/v1/learning-roadmaps/activities`: Logs granular study activity.
+- `GET /api/v1/learning-roadmaps/activities`: Retrieves chronological study history.
+- `GET /api/v1/learning-roadmaps/projects/recommendations`: Recommends practical portfolio projects.
+- `GET /api/v1/learning-roadmaps/projects`: Lists user tracked projects.
+- `POST /api/v1/learning-roadmaps/projects`: Creates or tracks a portfolio project.
+- `PATCH /api/v1/learning-roadmaps/projects/{id}`: Updates project status, repo URL, demo URL, and architecture evidence notes.
+- `PATCH /api/v1/learning-roadmaps/milestones/{id}`: Updates milestone status, completed hours, and practical exercise checkboxes.
+- `GET /api/v1/learning-roadmaps`: Lists user roadmaps with completion summaries.
+- `POST /api/v1/learning-roadmaps`: Generates personalized 4-stage roadmap adapted to resume evidence.
+- `GET /api/v1/learning-roadmaps/{id}`: Retrieves complete roadmap details with stages and exercises.
+- `PATCH /api/v1/learning-roadmaps/{id}/status`: Toggles roadmap status (`active`, `paused`).
+- `DELETE /api/v1/learning-roadmaps/{id}`: Deletes roadmap and cascades milestones.
+
+
