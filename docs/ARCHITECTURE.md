@@ -701,3 +701,80 @@ The Company Intelligence module separates shared organizational research from ca
 | **Refresh Token Storage** | Transmitted as an `HttpOnly`, `SameSite=Lax`, `Secure` (in production) cookie scoped to `/api/v1/auth`. Also provided in JSON body for non-browser clients. | Immune to browser JavaScript XSS extraction. Cross-Site Request Forgery is mitigated by `SameSite=Lax` and explicit endpoint paths. |
 | **Database Token Security** | Stored strictly as SHA-256 hashes (`token_hash`), never raw token strings. | In the event of a database snapshot leak, refresh tokens cannot be used to forge user sessions. |
 | **Rotation Protection** | Single-use refresh tokens: each refresh revokes the old token. | Revocation tracking detects replay attacks and invalidates compromised token chains. |
+
+---
+
+## 22. Career Command Center & Unified Analytics Architecture
+
+The Career Command Center (`/dashboard/career-command-center`) provides a unified, cross-module career intelligence cockpit for candidates. It consolidates activity across Discovery, Matching, Tailoring, Application Tracking, AI Application Assistant, Interview Prep Coach, and Company Intelligence into an integrated interface without duplicating data storage or introducing ungrounded AI percentage estimations.
+
+### 22.1 Architecture Principles
+1. **Zero Database Bloat & 100% Architectural Reuse**: No new database tables or migrations are required. The module leverages existing models (`Job`, `JobMatch`, `JobApplication`, `ApplicationStatusHistory`, `ApplicationPreparation`, `InterviewPreparationSession`, `InterviewEvaluation`, `ResumeAnalysis`, `ResumeVersion`, `Company`, `JobIntelligence`, `UserMatchingPreference`).
+2. **Strict Multi-Tenant User Isolation**: All aggregations and queries filter explicitly by `user_id == current_user.id` or user-owned resume/application associations. Cross-user leaks are mathematically impossible.
+3. **Real Database Aggregations**: All KPIs, funnel counts, conversion rates, and analytics are computed live from persistent records. Zero mock or hardcoded metric numbers.
+4. **Time-Horizon Filtering**: Supports `30d` (past 30 days), `90d` (past 90 days), and `all` (all-time) date ranges via `date_range` query parameters, filtering against `created_at` timestamps on tracked events.
+
+### 22.2 Real-Time Career KPIs & 7-Stage Application Funnel
+- **10 Core KPIs**:
+  1. `total_discovered_jobs`: Total active, verified opportunities discovered on the platform.
+  2. `verified_active_opportunities`: Currently active and verified job postings.
+  3. `strong_job_matches`: Discovered jobs with match score $\ge 75\%$ for the candidate.
+  4. `saved_opportunities`: Applications in `interested` status.
+  5. `applications_in_progress`: Applications in `preparing` status or active preparation sessions.
+  6. `applications_submitted`: Total applications with status in `applied`, `shortlisted`, `assessment`, `interview`, `offer`, `rejected`, or `withdrawn` (or confirmed submissions).
+  7. `interviews_scheduled`: Total scheduled interview rounds across applications.
+  8. `offers_received`: Total applications reaching `offer` status.
+  9. `resume_versions_created`: Total resume versions uploaded or tailored by the user.
+  10. `interview_prep_sessions_completed`: Total mock interview sessions completed.
+- **7-Stage Career Funnel**:
+  - Stages: `Discovered` $\to$ `Matched` $\to$ `Saved` $\to$ `Preparing` $\to$ `Applied` $\to$ `Interview` $\to$ `Offer`.
+  - Step conversions ($C_i = N_i / N_{i-1} \times 100$) and drop-offs ($D_i = N_{i-1} - N_i$).
+  - **No False Application Inflation**: External portal clicks (`open-link`) record link opening events without transitioning application state. Only verified status transitions in `application_status_history` and explicit `submission_confirmed` flags increment the `Applied` funnel step.
+
+### 22.3 Deterministic Career Readiness Scoring
+Rather than relying on ungrounded AI predictions, Nexora implements an explainable, deterministic readiness score ($S_{\text{readiness}} \in [0, 100]$):
+$$S_{\text{readiness}} = 0.40 \cdot S_{\text{skills}} + 0.30 \cdot S_{\text{match}} + 0.20 \cdot S_{\text{interview}} + 0.10 \cdot S_{\text{evidence}}$$
+
+Where:
+- $S_{\text{skills}}$: Demonstrated skills coverage against target roles and top market demand skills ($0 - 100$).
+- $S_{\text{match}}$: Average score across the user's top job matches ($0 - 100$).
+- $S_{\text{interview}}$: Average performance score across completed mock interview evaluations ($0 - 100$).
+- $S_{\text{evidence}}$: Project and experience evidence coverage verified in resume analysis ($0 - 100$).
+
+**Transparent Limitation Disclosure**: The UI and API explicitly display: *"Readiness score is an algorithmic synthesis (40% skills coverage, 30% top match score, 20% mock interview performance, 10% verified project evidence) based strictly on your uploaded resumes, saved jobs, and completed practice sessions. It is a preparation benchmark, not a guarantee of employment or external recruiter decision."*
+
+### 22.4 Deterministic Action Recommendation Engine
+Evaluates candidate state and produces prioritized recommendations with direct dashboard deep links:
+- **High Priority**:
+  - `scheduled_interview`: Upcoming scheduled interview rounds requiring revision.
+  - `company_research`: Applications reaching interview stage without completed company research.
+  - `incomplete_prep`: Application preparations in draft status needing submission.
+- **Medium Priority**:
+  - `application_followup`: Submitted applications awaiting response after 7+ days.
+  - `high_score_match`: Discovered matches $\ge 85\%$ that have not yet been saved or applied to.
+- **Low Priority**:
+  - `resume_tailoring`: High-match opportunities lacking a targeted tailored resume version.
+
+### 22.5 Job Search Performance Analytics
+- **Activity Trends**: Weekly and monthly time-series tracking saved jobs, tailored resumes, submitted applications, and interview sessions.
+- **Distributions**: Role family counts, company category breakdown, application status pipeline, and top location frequency.
+- **Conversion Metrics**: Interview conversion rate ($N_{\text{interview}} / N_{\text{applied}}$) and offer conversion rate ($N_{\text{offer}} / N_{\text{applied}}$).
+- **Small-Sample Safeguards**: When applications submitted is less than 5, the UI displays: *"More data needed (min 5 applications) for statistically meaningful rates"* rather than misleading percentages.
+- **Saved vs. Applied Comparison**: Quantifies application execution efficiency ($N_{\text{applied}} / N_{\text{saved}}$) with actionable feedback.
+
+### 22.6 Career Goals & Preferences Integration
+Reuses the `UserMatchingPreference` model without schema mutations:
+- Standard fields: `target_role_families`, `preferred_locations`, `work_arrangements`, `min_salary`, `priority_skills`.
+- Extended metadata: Stored cleanly within `metadata_json` (`weekly_application_target`, `preferred_company_categories`).
+- Progress tracking: Dynamically calculates weekly applications submitted vs `weekly_application_target` with real-time percentage progress.
+
+### 22.7 REST API Endpoints
+All endpoints mounted under `/api/v1/career-command-center` and require standard user authentication:
+- `GET /api/v1/career-command-center/overview?date_range={30d|90d|all}`: 10 Career KPIs and weekly goal progress.
+- `GET /api/v1/career-command-center/funnel?date_range={30d|90d|all}`: 7-stage funnel metrics, stage conversions, and drop-offs.
+- `GET /api/v1/career-command-center/readiness`: Algorithmic readiness score, component breakdown, demonstrated skills, skill gaps, interview rubric, project evidence, and formula disclosure.
+- `GET /api/v1/career-command-center/recommendations`: Prioritized recommended next actions with category tags and direct navigation URLs.
+- `GET /api/v1/career-command-center/analytics?timeframe={weekly|monthly}&date_range={30d|90d|all}`: Activity trends, role/category distributions, conversions with sample-size safeguards, and saved vs applied comparison.
+- `GET /api/v1/career-command-center/goals`: Target roles, priority skills, locations, salary, and weekly application target.
+- `PUT /api/v1/career-command-center/goals`: Updates user career goals and matching preferences atomically.
+

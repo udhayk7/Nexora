@@ -2640,6 +2640,232 @@ export const companyIntelligenceApi = {
     }),
 };
 
+// ---------------------------------------------------------------------------
+// Career Command Center Types & API (Prompt 18)
+// ---------------------------------------------------------------------------
+
+export interface CareerOverviewKPIs {
+  total_discovered_jobs: number;
+  active_verified_jobs: number;
+  strong_job_matches: number;
+  saved_opportunities: number;
+  applications_in_progress: number;
+  applications_submitted: number;
+  interviews_scheduled: number;
+  offers_received: number;
+  resume_versions_created: number;
+  interview_prep_sessions_completed: number;
+  weekly_application_target: number;
+  applications_this_week: number;
+  target_progress_percentage: number;
+  date_range: string;
+}
+
+export interface FunnelStageItem {
+  stage_id: string;
+  label: string;
+  count: number;
+  conversion_from_previous_percentage?: number | null;
+  drop_off_count: number;
+  drop_off_percentage: number;
+}
+
+export interface FunnelOutcomes {
+  active: number;
+  offered: number;
+  rejected: number;
+  withdrawn: number;
+}
+
+export interface CareerFunnelResponse {
+  stages: FunnelStageItem[];
+  outcomes: FunnelOutcomes;
+  methodology_notes: string;
+}
+
+export interface DemonstratedSkillItem {
+  skill: string;
+  evidence_count: number;
+  source_sections: string[];
+  category?: string | null;
+}
+
+export interface RequestedSkillItem {
+  skill: string;
+  frequency: number;
+  is_demonstrated_by_user: boolean;
+}
+
+export interface SkillGapItem {
+  skill: string;
+  market_demand_frequency: number;
+  status: "missing_entirely" | "unevidenced_mention";
+  recommendation: string;
+}
+
+export interface ProjectEvidenceItem {
+  title: string;
+  role_or_context: string;
+  measurable_outcomes: string[];
+  demonstrated_technologies: string[];
+}
+
+export interface InterviewPrepOverview {
+  completed_sessions_count: number;
+  evaluated_answers_count: number;
+  average_overall_score?: number | null;
+  rubric_averages: Record<string, number>;
+  top_strengths: string[];
+  areas_for_improvement: string[];
+}
+
+export interface TargetRoleAlignment {
+  target_role_families: string[];
+  average_match_score: number;
+  alignment_tier: string;
+}
+
+export interface CareerReadinessResponse {
+  readiness_score: number;
+  readiness_score_formula: string;
+  score_limitations: string;
+  score_breakdown: Record<string, number>;
+  demonstrated_skills: DemonstratedSkillItem[];
+  frequently_requested_skills: RequestedSkillItem[];
+  missing_or_underrepresented_skills: SkillGapItem[];
+  project_and_internship_evidence: ProjectEvidenceItem[];
+  interview_performance: InterviewPrepOverview;
+  target_role_alignment: TargetRoleAlignment;
+}
+
+export interface NextActionItem {
+  id: string;
+  priority: "high" | "medium" | "low";
+  action_type:
+    | "prepare_interview"
+    | "research_company"
+    | "complete_prep"
+    | "follow_up"
+    | "tailor_resume"
+    | "review_match"
+    | "skill_gap";
+  title: string;
+  reason: string;
+  related_entity_type?: string | null;
+  related_entity_id?: string | null;
+  navigation_url: string;
+  metadata?: Record<string, any>;
+}
+
+export interface RecommendationsResponse {
+  actions: NextActionItem[];
+  total_actions: number;
+}
+
+export interface ActivityDataPoint {
+  period: string;
+  applications_created: number;
+  applications_submitted: number;
+  interviews_scheduled: number;
+}
+
+export interface CategoryCount {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface StatusCount {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SkillFrequencyItem {
+  skill: string;
+  count: number;
+}
+
+export interface LocationCount {
+  location: string;
+  count: number;
+}
+
+export interface SavedVsAppliedComparison {
+  saved_count: number;
+  applied_count: number;
+  ratio: number;
+  insight: string;
+}
+
+export interface PerformanceAnalyticsResponse {
+  date_range: string;
+  weekly_activity: ActivityDataPoint[];
+  monthly_activity: ActivityDataPoint[];
+  applications_by_role_family: CategoryCount[];
+  applications_by_company_category: CategoryCount[];
+  interview_conversion_rate?: number | null;
+  interview_sample_size: number;
+  is_interview_sample_meaningful: boolean;
+  offer_conversion_rate?: number | null;
+  offer_sample_size: number;
+  is_offer_sample_meaningful: boolean;
+  application_status_distribution: StatusCount[];
+  most_frequently_matched_skills: SkillFrequencyItem[];
+  most_common_job_locations: LocationCount[];
+  saved_vs_applied: SavedVsAppliedComparison;
+}
+
+export interface CareerGoalsResponse {
+  target_role_families: string[];
+  preferred_locations: string[];
+  work_arrangement_preferences: string[];
+  min_salary?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
+  preferred_company_categories: string[];
+  priority_technical_skills: string[];
+  weekly_application_target: number;
+}
+
+export interface CareerGoalsUpdate {
+  target_role_families?: string[];
+  preferred_locations?: string[];
+  work_arrangement_preferences?: string[];
+  min_salary?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
+  preferred_company_categories?: string[];
+  priority_technical_skills?: string[];
+  weekly_application_target?: number;
+}
+
+export const careerCommandCenterApi = {
+  getOverview: (dateRange = "all") =>
+    apiClient<CareerOverviewKPIs>(`/career-command-center/overview?date_range=${dateRange}`),
+
+  getFunnel: () => apiClient<CareerFunnelResponse>("/career-command-center/funnel"),
+
+  getReadiness: () => apiClient<CareerReadinessResponse>("/career-command-center/readiness"),
+
+  getRecommendations: () =>
+    apiClient<RecommendationsResponse>("/career-command-center/recommendations"),
+
+  getAnalytics: (dateRange = "all") =>
+    apiClient<PerformanceAnalyticsResponse>(
+      `/career-command-center/analytics?date_range=${dateRange}`
+    ),
+
+  getGoals: () => apiClient<CareerGoalsResponse>("/career-command-center/goals"),
+
+  updateGoals: (data: CareerGoalsUpdate) =>
+    apiClient<CareerGoalsResponse>("/career-command-center/goals", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+};
+
+
 
 
 

@@ -74,6 +74,18 @@ Nexora is an AI-powered career discovery and application management platform des
 - Dedicated frontend workspace (`/dashboard/company-intelligence`) with company search, technology breakdown, hiring trends, candidate fit, report viewer with deletion, and public source provenance viewer with redirect badges.
 - Integrated shortcuts from Company Discovery and Job Discovery cards.
 
+### 9. Career Command Center & Unified Analytics (Completed — Prompt 18)
+- Centralized Career Command Center (`/dashboard/career-command-center`) consolidating intelligence from Discovery, Matching, Tailoring, Application Tracking, AI Application Assistant, Interview Prep Coach, and Company Intelligence without data duplication.
+- 10 Real-Time Career KPIs: Discovered jobs, verified active opportunities, strong matches ($\ge 75\%$), saved opportunities, applications in progress, applications submitted, interviews scheduled, offers received, resume versions created, and completed mock interview sessions.
+- 7-Stage Career Application Funnel (`Discovered` $\to$ `Matched` $\to$ `Saved` $\to$ `Preparing` $\to$ `Applied` $\to$ `Interview` $\to$ `Offer`) with step conversions and drop-offs strictly derived from `application_status_history` and verified submissions; external portal clicks (`open-link`) never falsely inflate application counts.
+- Deterministic Career Readiness Scoring ($S_{\text{readiness}} = 0.40 \cdot S_{\text{skills}} + 0.30 \cdot S_{\text{match}} + 0.20 \cdot S_{\text{interview}} + 0.10 \cdot S_{\text{evidence}}$) with KaTeX formula display, component scores, and explicit preparation benchmark limitation disclosure (no hallucinated AI percentage).
+- 3-Column Skills Analysis: Demonstrated skills backed by resume citations, top market demand skills from active job descriptions, and prioritized skill gaps.
+- Prioritized Action Recommendation Engine: High, medium, and low priority actions for upcoming interviews, missing company research, incomplete application preparations, aging submitted applications, strong job matches, and resume tailoring with direct navigation deep links.
+- Job Search Performance Analytics: Weekly and monthly activity trends, target role family distribution, company category breakdown, interview and offer conversion rates with small-sample safeguards ($N < 5$), application pipeline status distribution, and saved vs applied efficiency comparison.
+- Career Goals & Preferences: Seamless integration with `UserMatchingPreference` metadata (`weekly_application_target`, `preferred_company_categories`), supporting target role families, locations, salary floor, and priority skills with live weekly goal progress tracking.
+- Authenticated REST API endpoints mounted under `/api/v1/career-command-center/*` with strict multi-tenant user isolation and flexible date filtering (`30d`, `90d`, `all`).
+- Direct quick-launch dashboard card on `/dashboard` hub.
+
 ---
 
 ## Non-Functional Requirements

@@ -39,6 +39,15 @@ from app.schemas.assistant import (
     PreparationUpdateRequest,
     QAItem,
 )
+from app.schemas.career_command_center import (
+    CareerFunnelResponse,
+    CareerGoalsResponse,
+    CareerGoalsUpdate,
+    CareerOverviewKPIs,
+    CareerReadinessResponse,
+    PerformanceAnalyticsResponse,
+    RecommendationsResponse,
+)
 from app.schemas.company_intelligence import (
     CompanyFitAssessmentResponse,
     CompanyIntelligenceResponse,
@@ -196,4 +205,11 @@ __all__ = [
     "CompanyResearchReportSection",
     "CompanyResearchReportResponse",
     "CompanyResearchGenerateRequest",
+    "CareerOverviewKPIs",
+    "CareerFunnelResponse",
+    "CareerReadinessResponse",
+    "RecommendationsResponse",
+    "PerformanceAnalyticsResponse",
+    "CareerGoalsResponse",
+    "CareerGoalsUpdate",
 ]

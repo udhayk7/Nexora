@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, GraduationCap, Layers, LogOut, SendHorizontal, ShieldCheck, Sparkles, User } from "lucide-react";
+import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, GraduationCap, Layers, LogOut, SendHorizontal, ShieldCheck, Sparkles, User } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -106,6 +106,31 @@ export default function DashboardPage() {
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href="/dashboard/career-command-center"
+            className="group sm:col-span-2 p-6 rounded-xl border border-primary/30 bg-gradient-to-r from-card via-card to-primary/5 hover:border-primary/70 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-primary/10 text-primary">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                  New • Unified Navigator
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open Command Center <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+              Career Command Center
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              Unified career intelligence dashboard: live application funnel, deterministic career readiness score, market skill gaps, prioritized next actions, and search performance analytics.
+            </p>
+          </Link>
+
           <Link
             href="/dashboard/resumes"
             className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
