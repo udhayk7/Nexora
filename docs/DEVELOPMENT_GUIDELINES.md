@@ -107,6 +107,15 @@ def protected_view(current_user: User = Depends(get_current_active_user)):
 
 ---
 
+### AI Agent Orchestration & Career Copilot Guidelines
+- **Zero Duplicate Models**: AI orchestration must wrap and coordinate existing domain models and services (`Job`, `Resume`, `Company`, `Application`, `NetworkingContact`) rather than creating redundant database schemas.
+- **Context Hygiene & Data Minimization**: `SharedCandidateContext` projections MUST omit sensitive secrets, hashed passwords, session tokens, and raw multi-megabyte document blobs. Only verified structured facts are passed to agents.
+- **Bounded Pipelines & Cycle Prevention**: Multi-agent workflows are strictly limited to $\le 4$ sequential agent steps with iteration limits to guarantee termination and avoid unbounded recursion or AI cost inflation.
+- **Deterministic Python Fallback**: All agent workflows must include deterministic fallback pathways that synthesize grounded answers and actionable recommendations when external LLM providers are unavailable.
+- **Strict Human-in-the-Loop Approval Gates**: Consequential actions (e.g., sending emails via Gmail, submitting applications, publishing public portfolios) MUST be tagged with `requires_approval=True` and never executed autonomously.
+
+---
+
 ## Git & Version Control Practices
 
 - Commit messages should be descriptive and conventional (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`).

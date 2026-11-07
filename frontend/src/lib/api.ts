@@ -4060,6 +4060,165 @@ export const networkingApi = {
   getDueFollowups: () => apiClient<FollowUpDueResponse>("/networking/follow-ups/due"),
 };
 
+// ---------------------------------------------------------------------------
+// Advanced AI Agent Orchestration & Copilot Interfaces
+// ---------------------------------------------------------------------------
+
+export interface AgentTraceStep {
+  agent_name: string;
+  operation: string;
+  status: string;
+  latency_ms: number;
+  reasoning_summary: string;
+  output_summary: Record<string, unknown>;
+}
+
+export interface ActionProposal {
+  id: string;
+  action_type: string;
+  title: string;
+  description: string;
+  target_id?: string | null;
+  target_type?: string | null;
+  deep_link?: string | null;
+  requires_approval: boolean;
+  payload?: Record<string, unknown> | null;
+}
+
+export interface CopilotMessageItem {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  intent?: string | null;
+  agent_trace: AgentTraceStep[];
+  action_proposals: ActionProposal[];
+  token_usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    provider?: string;
+    model?: string;
+  } | null;
+  latency_ms?: number | null;
+  created_at: string;
+}
+
+export interface CopilotSessionItem {
+  id: string;
+  title: string;
+  session_type: string;
+  is_active: boolean;
+  message_count: number;
+  context_summary?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CopilotSessionDetail {
+  id: string;
+  title: string;
+  session_type: string;
+  is_active: boolean;
+  context_summary?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  messages: CopilotMessageItem[];
+}
+
+export interface AgentExecutionRecordItem {
+  id: string;
+  workflow_id: string;
+  session_id?: string | null;
+  agent_name: string;
+  operation: string;
+  status: string;
+  latency_ms: number;
+  tokens_used: number;
+  provider: string;
+  reasoning_summary?: string | null;
+  requires_approval: boolean;
+  approval_state?: string | null;
+  approved_at?: string | null;
+  rejection_reason?: string | null;
+  created_at: string;
+}
+
+export interface ApprovalActionResponse {
+  record_id: string;
+  status: string;
+  approval_state: string;
+  message: string;
+}
+
+export interface CandidateContextPreview {
+  full_name: string;
+  target_roles: string[];
+  verified_skills: string[];
+  career_readiness_score: number;
+  active_applications_count: number;
+  interviews_scheduled_count: number;
+  portfolio_published: boolean;
+  target_job_title?: string | null;
+  target_company_name?: string | null;
+}
+
+export const copilotApi = {
+  listSessions: (limit: number = 20) =>
+    apiClient<CopilotSessionItem[]>(`/copilot/sessions?limit=${limit}`),
+
+  createSession: (payload: { title?: string; session_type?: string }) =>
+    apiClient<CopilotSessionItem>("/copilot/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getSession: (sessionId: string) =>
+    apiClient<CopilotSessionDetail>(`/copilot/sessions/${sessionId}`),
+
+  deleteSession: (sessionId: string) =>
+    apiClient<{ status: string; id: string }>(`/copilot/sessions/${sessionId}`, {
+      method: "DELETE",
+    }),
+
+  postMessage: (
+    sessionId: string,
+    payload: { content: string; target_job_id?: string; target_company_id?: string }
+  ) =>
+    apiClient<CopilotMessageItem>(`/copilot/sessions/${sessionId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  executeQuickAction: (payload: {
+    action: string;
+    target_id?: string;
+    parameters?: Record<string, unknown>;
+  }) =>
+    apiClient<CopilotMessageItem>("/copilot/actions/quick", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getWorkflowExecutions: (workflowId: string) =>
+    apiClient<AgentExecutionRecordItem[]>(`/copilot/executions/${workflowId}`),
+
+  handleApproval: (recordId: string, payload: { action: string; notes?: string }) =>
+    apiClient<ApprovalActionResponse>(`/copilot/executions/${recordId}/approval`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getContextPreview: (targetJobId?: string, targetCompanyId?: string) => {
+    const params = new URLSearchParams();
+    if (targetJobId) params.append("target_job_id", targetJobId);
+    if (targetCompanyId) params.append("target_company_id", targetCompanyId);
+    const query = params.toString();
+    return apiClient<CandidateContextPreview>(`/copilot/context${query ? `?${query}` : ""}`);
+  },
+};
+
+
 
 
 

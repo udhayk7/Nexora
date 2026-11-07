@@ -125,6 +125,19 @@ from app.schemas.notification import (
     UserNotificationPreferenceResponse,
     UserNotificationPreferenceUpdate,
 )
+from app.schemas.orchestration import (
+    ActionProposal,
+    AgentExecutionRecordResponse,
+    AgentTraceStep,
+    ApprovalActionRequest,
+    ApprovalActionResponse,
+    CopilotMessageCreateRequest,
+    CopilotMessageResponse,
+    CopilotSessionCreateRequest,
+    CopilotSessionDetailResponse,
+    CopilotSessionResponse,
+    QuickActionRequest,
+)
 from app.schemas.portfolio import (
     AIPortfolioAssistRequest,
     AIPortfolioAssistResponse,
@@ -356,4 +369,15 @@ __all__ = [
     "OutreachMessageResponse",
     "FollowUpDueItem",
     "FollowUpDueResponse",
+    "AgentTraceStep",
+    "ActionProposal",
+    "CopilotSessionCreateRequest",
+    "CopilotSessionResponse",
+    "CopilotMessageCreateRequest",
+    "CopilotMessageResponse",
+    "CopilotSessionDetailResponse",
+    "QuickActionRequest",
+    "AgentExecutionRecordResponse",
+    "ApprovalActionRequest",
+    "ApprovalActionResponse",
 ]

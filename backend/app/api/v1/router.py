@@ -7,6 +7,7 @@ from app.api.v1.career_command_center import router as career_command_center_rou
 from app.api.v1.career_workflow import router as career_workflow_router
 from app.api.v1.companies import companies_router
 from app.api.v1.company_intelligence import router as company_intelligence_router
+from app.api.v1.copilot import router as copilot_router
 from app.api.v1.discovery import router as discovery_router
 from app.api.v1.integrations import router as integrations_router
 from app.api.v1.interview_prep import router as interview_prep_router
@@ -61,3 +62,4 @@ api_router.include_router(learning_roadmaps_router)
 api_router.include_router(portfolios_router)
 api_router.include_router(career_workflow_router)
 api_router.include_router(networking_router)
+api_router.include_router(copilot_router)

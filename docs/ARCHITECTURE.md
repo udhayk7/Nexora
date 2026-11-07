@@ -1027,6 +1027,86 @@ $$S_{\text{recruiter}} = 0.35 \times S_{\text{role}} + 0.30 \times S_{\text{comp
 - `POST /api/v1/networking/outreach/messages/{id}/send-gmail`: Dispatch approved email via Gmail with `confirm_send=True`.
 - `GET /api/v1/networking/follow-ups/due`: Returns contacts overdue for follow-up (>5 days or passed date).
 
+---
+
+## 27. Advanced AI Agent Orchestration & Career Copilot Architecture
+
+### 27.1 Architecture Overview
+The Central AI Orchestrator transforms Nexora into a coordinated multi-agent intelligence platform. Rather than fragmented isolated features, 8 specialized agents collaborate dynamically to fulfill candidate career objectives while reusing existing database models, domain algorithms, and AI provider abstractions.
+
+```
+Candidate Request / Goal
+           │
+           ▼
+┌────────────────────────────────────────────────────────┐
+│               Central AI Orchestrator                  │
+│  - Intent Classifier & Pipeline Resolver               │
+│  - Shared Candidate Context Projector                  │
+│  - Iteration & Cycle Boundary Guards (≤4 steps)        │
+└───────┬──────────────────────────────┬─────────────────┘
+        │                              │
+        ▼                              ▼
+┌───────────────────────────┐  ┌───────────────────────────┐
+│ Specialized Domain Agents │  │ Shared Candidate Context  │
+│ 1. Resume Intelligence    │  │ - Verified Facts Only     │
+│ 2. Job Discovery          │  │ - Scrubbed Credentials    │
+│ 3. Job Matching           │  │ - Target Roles & Skills   │
+│ 4. Company Intelligence   │  │ - Funnel & Score Metrics  │
+│ 5. Application Prep       │  └───────────────────────────┘
+│ 6. Recruiter Networking   │
+│ 7. Interview Prep         │
+│ 8. Career Strategy        │
+└─────────────┬─────────────┘
+              │
+              ▼
+┌────────────────────────────────────────────────────────┐
+│               Candidate Approval Gate                  │
+│  - Non-consequential: Direct Workspace Deep Links     │
+│  - Consequential: Candidate Review Required (Gmail,    │
+│    External Submission, Public Portfolio)              │
+└────────────────────────────────────────────────────────┘
+```
+
+### 27.2 The 8 Specialized Agents (`app/services/orchestration/agents/*`)
+1. **Resume Intelligence Agent (`resume_intelligence`)**: Analyzes candidate resume versions, extracts verified skills, identifies evidence-backed strengths and missing keywords, and recommends role families.
+2. **Job Discovery Agent (`job_discovery`)**: Discovers active jobs, prioritizing verified entry-level and fresher opportunities matching candidate preferences.
+3. **Job Matching Agent (`job_matching`)**: Computes multi-factor match score ($S_{\text{match}}$), identifies matched competencies and eligibility gaps, and filters high-confidence opportunities.
+4. **Company Intelligence Agent (`company_intelligence`)**: Researches confirmed technologies, hiring summaries, and cultural values with provenance metadata.
+5. **Application Preparation Agent (`application_preparation`)**: Grounded resume tailoring bullet points, tailored cover letter snippets, and STAR screening question talking points. Consequential actions (`send_recruiter_email`) require explicit candidate approval.
+6. **Recruiter Networking Agent (`recruiter_networking`)**: Matches relevant recruitment contacts and crafts grounded LinkedIn connection notes strictly $\le 300$ characters.
+7. **Interview Preparation Agent (`interview_preparation`)**: Generates 3-tier mock questions grounded in verified projects, revision topics, and deep links to mock interview sessions.
+8. **Career Strategy Agent (`career_strategy`)**: Synthesizes cross-module telemetry into a prioritized weekly action plan across applications, networking, mock interviews, and portfolio evidence.
+
+### 27.3 Secure Shared Candidate Context (`SharedCandidateContext`)
+Maintains a lean, memory-efficient JSON projection of candidate telemetry:
+- Project verified skills, education, target roles, preferred arrangements, active application counts, interview counts, and career readiness scores.
+- Omits passwords, API keys, private tokens, and unverified credentials.
+- Bounded token footprint ensures prompts never overflow LLM context windows or inflate inference costs.
+
+### 27.4 Deterministic Python Synthesis Fallback
+When AI provider API keys are unconfigured, rate-limited, or encounter downstream network failures, `ModelRouter` seamlessly activates deterministic synthesis. The system delivers structured, verified intelligence and actionable recommendations with a **zero-failure guarantee**.
+
+### 27.5 Human-in-the-Loop Approval Safeguards
+Consequential operations (`requires_approval=True`):
+- Sending recruiter emails via Gmail.
+- Submitting applications to external employer portals.
+- Publishing portfolio studio websites publicly.
+- Explicitly captured in `agent_execution_records` with candidate `approval_state` (`pending`, `approved`, `rejected`).
+
+### 27.6 Data Models & REST Endpoints
+- **Models**: `CopilotSession`, `CopilotMessage`, `AgentExecutionRecord`.
+- **API Endpoints (`/api/v1/copilot/*`)**:
+  - `GET /sessions`: List chat sessions with message counts.
+  - `POST /sessions`: Create new session.
+  - `GET /sessions/{id}`: Detailed session message history.
+  - `DELETE /sessions/{id}`: Soft delete session.
+  - `POST /sessions/{id}/messages`: Process user message through multi-agent orchestration.
+  - `POST /actions/quick`: Execute canned one-click career actions.
+  - `GET /executions/{workflow_id}`: Audit trail of agent execution traces.
+  - `POST /executions/{record_id}/approval`: Record candidate approval/rejection.
+  - `GET /context`: Retrieve lean candidate context projection.
+
+
 
 
 

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.networking import NetworkingContact
     from app.models.notification import Notification, UserNotificationPreference
+    from app.models.orchestration import CopilotSession
     from app.models.portfolio import Portfolio
     from app.models.recommendation import AIJobMatch
     from app.models.resume import Resume
@@ -180,6 +181,11 @@ class User(Base, TimestampMixin):
     )
     networking_contacts: Mapped[list["NetworkingContact"]] = relationship(
         "NetworkingContact",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    copilot_sessions: Mapped[list["CopilotSession"]] = relationship(
+        "CopilotSession",
         back_populates="user",
         cascade="all, delete-orphan",
     )

@@ -43,6 +43,11 @@ from app.models.networking import (
     RecruiterProfile,
 )
 from app.models.notification import Notification, UserNotificationPreference
+from app.models.orchestration import (
+    AgentExecutionRecord,
+    CopilotMessage,
+    CopilotSession,
+)
 from app.models.portfolio import (
     Portfolio,
     PortfolioProject,
@@ -110,4 +115,7 @@ __all__ = [
     "NetworkingContact",
     "NetworkingOutreachMessage",
     "NetworkingActivity",
+    "CopilotSession",
+    "CopilotMessage",
+    "AgentExecutionRecord",
 ]

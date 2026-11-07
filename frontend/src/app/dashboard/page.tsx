@@ -107,6 +107,31 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Link
+            href="/dashboard/ai-copilot"
+            className="group sm:col-span-2 p-6 rounded-xl border border-primary/50 bg-gradient-to-r from-card via-purple-500/10 to-primary/10 hover:border-primary transition-all shadow-md"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-lg bg-primary/20 text-primary">
+                  <Bot className="w-6 h-6" />
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary">
+                  New • Multi-Agent Orchestration
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open Career Copilot <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors">
+              AI Career Copilot &amp; Multi-Agent Orchestrator
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              Coordinated multi-agent career intelligence connecting 8 specialized agents: Resume Intelligence, Job Discovery, Job Matching, Company Intelligence, Application Preparation, Recruiter Networking, Interview Coaching, and Career Strategy with human-in-the-loop approval.
+            </p>
+          </Link>
+
+          <Link
             href="/dashboard/career-workflow"
             className="group sm:col-span-2 p-6 rounded-xl border border-primary/40 bg-gradient-to-r from-card via-primary/5 to-purple-500/5 hover:border-primary/80 transition-all shadow-md"
           >

@@ -129,6 +129,16 @@ Nexora is an AI-powered career discovery and application management platform des
 - Follow-up Intelligence: Automated Celery background task (`check_networking_followups_task`) detecting overdue outreach (>5 days) and surfacing deduplicated alerts.
 - Dedicated SaaS UI workspace at `/dashboard/networking` with Overview KPIs, Recruiter Discovery, Networking CRM, AI Outreach Studio, and Activity Timeline.
 
+### 23. Advanced AI Agent Orchestration & Career Copilot (Prompt 23)
+- Central AI Orchestrator: Dynamic intent-driven coordination layer connecting 8 specialized agents (`ResumeIntelligenceAgent`, `JobDiscoveryAgent`, `JobMatchingAgent`, `CompanyIntelligenceAgent`, `ApplicationPreparationAgent`, `RecruiterNetworkingAgent`, `InterviewPreparationAgent`, `CareerStrategyAgent`).
+- Reuse of Domain Assets: Orchestration reuses existing database tables and services without duplicate models or unnecessary micro-architectures.
+- Secure Shared Candidate Context: Projects lean qualifications, verified skills, and funnel KPIs while omitting passwords, credentials, and raw unstructured multi-megabyte payloads.
+- Bounded Multi-Agent Workflows: Maximum 4 sequential agent steps per pipeline with strict cycle protection to prevent infinite loops and control AI inference costs.
+- Deterministic Python Fallback: Zero-failure guarantee ensuring all operations synthesize grounded responses when AI provider credentials are missing or services fail.
+- Human-in-the-Loop Approval Safeguards: Consequential actions (dispatching emails via Gmail, submitting job applications, publishing portfolio studio) strictly enforce explicit candidate approval (`requires_approval=True`).
+- Audit Transparency & Tracking: Persists every agent operation, latency, token usage, and candidate approval state in `agent_execution_records`.
+- Dedicated SaaS UI Workspace: `/dashboard/ai-copilot` featuring full conversational thread, live collapsible agent execution traces, structured recommendation cards, candidate approval dialogs, suggested prompt chips, and a right-side candidate context drawer.
+
 ---
 
 ## Non-Functional Requirements
