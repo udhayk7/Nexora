@@ -4,6 +4,7 @@ from app.api.v1.applications import applications_router
 from app.api.v1.assistant import router as assistant_router
 from app.api.v1.auth import auth_router
 from app.api.v1.companies import companies_router
+from app.api.v1.company_intelligence import router as company_intelligence_router
 from app.api.v1.discovery import router as discovery_router
 from app.api.v1.integrations import router as integrations_router
 from app.api.v1.interview_prep import router as interview_prep_router
@@ -45,3 +46,4 @@ api_router.include_router(recommendations_router)
 api_router.include_router(assistant_router)
 api_router.include_router(integrations_router)
 api_router.include_router(interview_prep_router)
+api_router.include_router(company_intelligence_router)

@@ -669,6 +669,14 @@ export default function CompaniesPage() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/dashboard/company-intelligence?company_id=${company.id}`}
+                        className="px-2 py-1 text-xs font-semibold rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors inline-flex items-center gap-1"
+                        title="Explore evidence-backed company intelligence"
+                      >
+                        Intelligence
+                      </Link>
+
                       <button
                         onClick={() => {
                           setVerifyCompanyId(company.id);

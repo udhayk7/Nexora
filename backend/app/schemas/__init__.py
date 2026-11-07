@@ -39,6 +39,18 @@ from app.schemas.assistant import (
     PreparationUpdateRequest,
     QAItem,
 )
+from app.schemas.company_intelligence import (
+    CompanyFitAssessmentResponse,
+    CompanyIntelligenceResponse,
+    CompanyProductOrService,
+    CompanyResearchGenerateRequest,
+    CompanyResearchReportResponse,
+    CompanyResearchReportSection,
+    CompanyResearchSourceResponse,
+    HiringSummarySchema,
+    RecentDevelopmentItem,
+    TechnologyItemSchema,
+)
 from app.schemas.health import HealthResponse
 from app.schemas.interview_prep import (
     InterviewAnalyticsResponse,
@@ -174,4 +186,14 @@ __all__ = [
     "InterviewNoteResponse",
     "InterviewAnalyticsResponse",
     "InterviewReminderCreateRequest",
+    "TechnologyItemSchema",
+    "CompanyProductOrService",
+    "RecentDevelopmentItem",
+    "HiringSummarySchema",
+    "CompanyIntelligenceResponse",
+    "CompanyResearchSourceResponse",
+    "CompanyFitAssessmentResponse",
+    "CompanyResearchReportSection",
+    "CompanyResearchReportResponse",
+    "CompanyResearchGenerateRequest",
 ]

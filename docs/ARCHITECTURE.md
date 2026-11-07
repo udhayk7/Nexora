@@ -608,6 +608,51 @@ Core invariants enforced:
 
 ---
 
+## 21. Company Intelligence & Employer Research Architecture
+
+### 21.1 Overview & System Invariants
+The Company Intelligence module provides candidates with transparent, evidence-grounded research on hiring organizations prior to applying or interviewing.
+
+Core invariants enforced:
+1. **Zero Fabrication**: Company headcount, revenue, and funding are only reported when verifiable evidence exists in official sources. Missing or non-disclosed metrics are explicitly labeled `"Undisclosed"` or `"Not publicly evidenced"`.
+2. **Provenance & Evidence Tiers**: Every identified technology is classified into one of four evidence strengths:
+   - `confirmed`: Direct official mention in company web pages, engineering blogs, or technical publications.
+   - `supported`: Mentioned across multiple active or recent job requisitions in the Nexora database.
+   - `inferred`: Derived from secondary ecosystems, plugins, or existing company profile tags with transparent attribution.
+   - `unknown`: When evidence is ambiguous or unverified.
+3. **Safe Public Web Research**: All outbound HTTP fetches use `SSRFSafeTransport` with connection-time DNS rebinding validation, blocking access to private/internal CIDRs, loopbacks, and cloud metadata services.
+4. **Hiring Truth Grounding**: Aggregated hiring trends (active jobs, entry-level, internships, top categories, locations) are calculated strictly from discovered job records in the Nexora database, distinguishing active from expired/stale postings.
+5. **Grounded Candidate Fit**: Evaluates alignment between verified resume skills, user career preferences, and company technologies without exaggerating candidate qualifications.
+6. **Deterministic Caching**: 10-section research reports compute a SHA-256 digest of `(company_id, source_content_hash, candidate_skills, job_ids)` and return cached reports unless `force_refresh` is requested.
+
+### 21.2 Data Models & Relational Architecture
+- **`CompanyIntelligence` (`company_intelligence`)**:
+  - One-to-one with `Company`. Stores `overview`, `industry_domain`, `headquarters`, `operating_locations`, `website_url`, `careers_url`, `products_and_services` (JSONB), `technology_stack` (JSONB), `size_band`, `size_evidence`, `funding_ownership_info`, `recent_developments` (JSONB), `hiring_summary` (JSONB), `source_content_hash`, `last_researched_at`, `is_stale`, `provenance_sources_count`.
+- **`CompanyResearchSource` (`company_research_sources`)**:
+  - Many-to-one with `Company`. Stores `source_type` (`official_website`, `careers_page`, `engineering_blog`, `news_release`, `public_feed`), `source_url`, `title`, `content_snippet`, `raw_content`, `content_hash` (SHA-256), `retrieved_at`, `is_verified`.
+- **`CompanyResearchReport` (`company_research_reports`)**:
+  - Scoped to `user_id` and `company_id`. Stores `report_title`, `sections` (10-section dictionary), `candidate_fit` (JSONB), `source_evidence` (JSONB array), `content_hash` (SHA-256 cache key), `provider`, `model`, `is_cached`, `is_deterministic_fallback`.
+
+### 21.3 Public Web Ingestion & Technology Classification
+- **`OfficialWebsiteAdapter` (`services/company_intelligence/adapters.py`)**: Safely fetches homepage, about page, and careers page via `SSRFSafeTransport`, extracting clean text with standard library `SimpleHTMLTextExtractor` and computing content hashes.
+- **`TechnologyExtractor` (`services/company_intelligence/technology_extractor.py`)**: Matches against canonical taxonomy across 8 categories (Languages, Frameworks, Cloud, Databases, AI/ML, DevOps, Dev Tools, Practices), classifying evidence strength based on source provenance.
+- **`FitEvaluator` (`services/company_intelligence/fit_evaluator.py`)**: Computes fit score, matching competencies, gap skills, role matches, and customized interview focus points.
+
+### 21.4 10-Section AI Research Dossier
+- Structured sections:
+  1. `overview`: Company overview and mission
+  2. `products_and_services`: Products, services, and business model
+  3. `technology_landscape`: Technology landscape and engineering stack
+  4. `engineering_culture`: Engineering culture, practices, and public technical work
+  5. `hiring_activity`: Hiring activity and growth trends
+  6. `entry_level_opportunities`: Relevant entry-level and fresher opportunities
+  7. `candidate_alignment`: Candidate-company alignment (skills, strengths, gaps)
+  8. `interview_prep_topics`: Recommended interview preparation topics
+  9. `recruiter_interviewer_questions`: Thoughtful questions to ask recruiters and interviewers
+  10. `sources_and_evidence`: Sources and evidence summary
+
+---
+
 ## Token & Cookie Security Strategy
 
 | Aspect | Strategy & Implementation | Tradeoff / Mitigation |

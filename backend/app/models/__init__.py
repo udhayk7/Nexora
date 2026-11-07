@@ -15,6 +15,11 @@ from app.models.assistant import (
 )
 from app.models.base import Base
 from app.models.company import Company, CompanySource, DiscoveryScanLog
+from app.models.company_intelligence import (
+    CompanyIntelligence,
+    CompanyResearchReport,
+    CompanyResearchSource,
+)
 from app.models.interview_prep import (
     InterviewAnswer,
     InterviewEvaluation,
@@ -41,6 +46,9 @@ __all__ = [
     "Company",
     "CompanySource",
     "DiscoveryScanLog",
+    "CompanyIntelligence",
+    "CompanyResearchSource",
+    "CompanyResearchReport",
     "Job",
     "JobSource",
     "JobVerification",

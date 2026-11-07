@@ -57,6 +57,16 @@ Nexora is an AI-powered career discovery and application management platform des
 - Automated preparation reminder alarms integrated into existing `NotificationService` and Celery infrastructure.
 - Direct shortcut from Application Tracker interview rounds without automatically modifying application status.
 
+### 8. Company Intelligence & Employer Research (Completed — Prompt 17)
+- Evidence-backed company intelligence profiles covering overview, industry domain, operating locations, products/services, size, and funding without fabrication.
+- Modular public research-source architecture fetching official websites, about pages, careers pages, and engineering blogs via `SSRFSafeTransport`.
+- Engineering technology intelligence with 4-tier evidence classifications (`confirmed`, `supported`, `inferred`, `unknown`) and citation sources.
+- Grounded hiring intelligence strictly computed from active discovered DB jobs (entry-level, internships, categories, locations).
+- Candidate-to-company fit assessment evaluating overlapping skills, flagged gap areas, role alignments, and customized interview preparation advice.
+- Structured 10-section AI research reports (`company_research_reports`) with deterministic SHA-256 caching and user ownership.
+- Dedicated frontend workspace (`/dashboard/company-intelligence`) with company search, technology breakdown, hiring trends, candidate fit, and report viewer.
+- Integrated shortcuts from Company Discovery and Job Discovery cards.
+
 ---
 
 ## Non-Functional Requirements

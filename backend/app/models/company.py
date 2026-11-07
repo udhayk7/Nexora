@@ -11,6 +11,11 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.application import JobApplication
+    from app.models.company_intelligence import (
+        CompanyIntelligence,
+        CompanyResearchReport,
+        CompanyResearchSource,
+    )
     from app.models.job import Job
     from app.models.user import User
 
@@ -159,6 +164,24 @@ class Company(Base, TimestampMixin):
     applications: Mapped[list["JobApplication"]] = relationship(
         "JobApplication",
         back_populates="company",
+    )
+    intelligence: Mapped[Optional["CompanyIntelligence"]] = relationship(
+        "CompanyIntelligence",
+        back_populates="company",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    research_sources: Mapped[list["CompanyResearchSource"]] = relationship(
+        "CompanyResearchSource",
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="desc(CompanyResearchSource.retrieved_at)",
+    )
+    research_reports: Mapped[list["CompanyResearchReport"]] = relationship(
+        "CompanyResearchReport",
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="desc(CompanyResearchReport.created_at)",
     )
 
 

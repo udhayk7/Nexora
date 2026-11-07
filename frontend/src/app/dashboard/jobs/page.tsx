@@ -1029,6 +1029,17 @@ export default function JobsPage() {
                         Tailor
                       </Link>
 
+                      {job.company_id && (
+                        <Link
+                          href={`/dashboard/company-intelligence?company_id=${job.company_id}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-cyan-950/70 text-cyan-300 border border-cyan-800/50 hover:bg-cyan-900 transition"
+                          title="Research employer intelligence and tech stack"
+                        >
+                          <Building2 className="w-3 h-3 text-cyan-400" />
+                          Research
+                        </Link>
+                      )}
+
                       <button
                         onClick={() => {
                           setVerifyJobId(job.id);

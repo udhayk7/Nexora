@@ -147,6 +147,26 @@ export default function DashboardPage() {
           </Link>
 
           <Link
+            href="/dashboard/company-intelligence"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Research Employers <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              Company Intelligence & Research
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Evidence-backed tech stack classification, DB hiring analytics, candidate fit assessment, and 10-section AI research dossiers.
+            </p>
+          </Link>
+
+          <Link
             href="/dashboard/jobs"
             className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
           >

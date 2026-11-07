@@ -2461,6 +2461,176 @@ export const interviewPrepApi = {
     ),
 };
 
+// ============================================================================
+// Company Intelligence & Research Interfaces & API
+// ============================================================================
+
+export interface TechnologyItemSchema {
+  name: string;
+  category: string;
+  evidence_strength: "confirmed" | "supported" | "inferred" | "unknown";
+  evidence_source: string;
+  context?: string | null;
+}
+
+export interface CompanyProductOrService {
+  name: string;
+  description: string;
+  category?: string | null;
+  evidence_source?: string | null;
+}
+
+export interface RecentDevelopmentItem {
+  headline: string;
+  summary: string;
+  source_url?: string | null;
+  date?: string | null;
+}
+
+export interface HiringSummarySchema {
+  total_active_jobs: number;
+  entry_level_jobs: number;
+  internship_jobs: number;
+  experienced_jobs: number;
+  top_categories: Array<{ category: string; count: number }>;
+  top_locations: string[];
+  active_technologies: string[];
+  stale_or_expired_jobs: number;
+  last_job_posted_at?: string | null;
+}
+
+export interface CompanyIntelligenceResponse {
+  id: string;
+  company_id: string;
+  company_name: string;
+  overview?: string | null;
+  industry_domain?: string | null;
+  headquarters?: string | null;
+  operating_locations: string[];
+  website_url?: string | null;
+  careers_url?: string | null;
+  products_and_services: CompanyProductOrService[];
+  technology_stack: TechnologyItemSchema[];
+  size_band?: string | null;
+  size_evidence?: string | null;
+  funding_ownership_info?: string | null;
+  recent_developments: RecentDevelopmentItem[];
+  hiring_summary: HiringSummarySchema;
+  last_researched_at?: string | null;
+  is_stale: boolean;
+  provenance_sources_count: number;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanyResearchSourceResponse {
+  id: string;
+  company_id: string;
+  source_type: string;
+  source_url: string;
+  title: string;
+  content_snippet?: string | null;
+  content_hash: string;
+  retrieved_at: string;
+  published_at?: string | null;
+  is_verified: boolean;
+  metadata_json: Record<string, unknown>;
+}
+
+export interface CompanyFitAssessmentResponse {
+  company_id: string;
+  company_name: string;
+  fit_score: number;
+  fit_level: "strong" | "moderate" | "developing";
+  matching_skills: string[];
+  missing_or_gap_skills: string[];
+  role_alignment_summary: string;
+  target_role_matches: Array<{
+    job_id: string;
+    title: string;
+    seniority_level: string;
+    location: string;
+    job_status: string;
+  }>;
+  recommended_interview_focus: string[];
+  fit_evidence: string[];
+}
+
+export interface CompanyResearchReportSection {
+  key: string;
+  title: string;
+  content: string;
+  bullet_points: string[];
+}
+
+export interface CompanyResearchReportResponse {
+  id: string;
+  company_id: string;
+  company_name: string;
+  user_id: string;
+  report_title: string;
+  sections: Record<string, CompanyResearchReportSection>;
+  candidate_fit?: CompanyFitAssessmentResponse | null;
+  source_evidence: Array<{
+    title: string;
+    source_url: string;
+    source_type?: string;
+    content_snippet?: string;
+    is_verified?: boolean;
+  }>;
+  provider: string;
+  model: string;
+  is_cached: boolean;
+  is_deterministic_fallback: boolean;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanyResearchGenerateRequest {
+  force_refresh?: boolean;
+  focus_areas?: string[] | null;
+  resume_version_id?: string | null;
+}
+
+export const companyIntelligenceApi = {
+  getIntelligence: (companyId: string, refresh = false) =>
+    apiClient<CompanyIntelligenceResponse>(
+      `/companies/${companyId}/intelligence${refresh ? "?refresh=true" : ""}`
+    ),
+
+  getTechnology: (companyId: string) =>
+    apiClient<TechnologyItemSchema[]>(`/companies/${companyId}/technology`),
+
+  getHiring: (companyId: string) =>
+    apiClient<HiringSummarySchema>(`/companies/${companyId}/hiring`),
+
+  getFit: (companyId: string, resumeVersionId?: string) => {
+    const qs = resumeVersionId ? `?resume_version_id=${resumeVersionId}` : "";
+    return apiClient<CompanyFitAssessmentResponse>(`/companies/${companyId}/fit${qs}`);
+  },
+
+  getSources: (companyId: string) =>
+    apiClient<CompanyResearchSourceResponse[]>(`/companies/${companyId}/sources`),
+
+  generateReport: (companyId: string, data: CompanyResearchGenerateRequest) =>
+    apiClient<CompanyResearchReportResponse>(`/companies/${companyId}/research/generate`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listCompanyReports: (companyId: string) =>
+    apiClient<CompanyResearchReportResponse[]>(`/companies/${companyId}/research/reports`),
+
+  listAllReports: () =>
+    apiClient<CompanyResearchReportResponse[]>("/company-intelligence/reports"),
+
+  getReportDetail: (reportId: string) =>
+    apiClient<CompanyResearchReportResponse>(`/company-intelligence/reports/${reportId}`),
+};
+
+
 
 
 

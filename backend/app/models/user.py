@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.application import JobApplication
     from app.models.assistant import ApplicationPreparation, GmailConnection
     from app.models.company import Company
+    from app.models.company_intelligence import CompanyResearchReport
     from app.models.interview_prep import (
         InterviewPreparationNote,
         InterviewPreparationSession,
@@ -144,6 +145,11 @@ class User(Base, TimestampMixin):
     )
     interview_notes: Mapped[list["InterviewPreparationNote"]] = relationship(
         "InterviewPreparationNote",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    company_research_reports: Mapped[list["CompanyResearchReport"]] = relationship(
+        "CompanyResearchReport",
         back_populates="user",
         cascade="all, delete-orphan",
     )
