@@ -11,6 +11,7 @@ from app.models.analysis import ResumeAnalysis
 from app.models.resume import Resume, ResumeVersion
 from app.models.user import User
 from app.services.ai.base import AIProviderError
+from app.services.ai.cost_manager import AICostManager
 from app.services.ai.factory import get_ai_provider
 
 
@@ -118,6 +119,19 @@ class ResumeAnalysisService:
 
             db.commit()
             db.refresh(analysis)
+
+            AICostManager.record_usage(
+                db=db,
+                user_id=current_user.id,
+                provider=provider.name,
+                model=provider.model_name,
+                feature="resume_analysis",
+                prompt_tokens=ai_response.prompt_tokens or 0,
+                completion_tokens=ai_response.completion_tokens or 0,
+                total_tokens=ai_response.total_tokens or 0,
+                estimated_cost_usd=ai_response.estimated_cost_usd or 0.0,
+                request_status="success",
+            )
 
             audit_service.record_event(
                 action="resume.analysis_completed",

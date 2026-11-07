@@ -1,8 +1,12 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol
+from typing import Any, Literal, Optional, Protocol
+
+from pydantic import BaseModel
 
 from app.core.errors import AppError
 from app.schemas.analysis import ResumeAnalysisResult
+
+ModelTier = Literal["routine", "strong"]
 
 
 class AIProviderError(AppError):
@@ -63,10 +67,36 @@ class AIProvider(Protocol):
     @property
     def is_configured(self) -> bool: ...
 
+    def get_model_for_tier(self, tier: ModelTier = "routine") -> str: ...
+
     def analyze_resume(
         self,
         resume_text: str,
         structured_sections: Optional[dict[str, Any]] = None,
     ) -> AIProviderResponse:
         """Analyze resume text and return structured, evidence-grounded result."""
+        ...
+
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: Optional[str] = None,
+        tier: ModelTier = "routine",
+        max_tokens: Optional[int] = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Generate open-ended text response with usage telemetry."""
+        ...
+
+    def generate_json(
+        self,
+        prompt: str,
+        schema: Optional[type[BaseModel]] = None,
+        system_instruction: Optional[str] = None,
+        tier: ModelTier = "routine",
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Generate structured JSON response with usage telemetry."""
+        ...
+
+    def test_connection(self) -> dict[str, Any]:
+        """Perform a lightweight diagnostic test to verify provider connectivity."""
         ...

@@ -1,5 +1,6 @@
 """SQLAlchemy models package."""
 
+from app.models.ai_usage import AIUsageLog
 from app.models.analysis import ResumeAnalysis
 from app.models.application import (
     ApplicationActivity,
@@ -66,6 +67,7 @@ __all__ = [
     "Base",
     "User",
     "RefreshToken",
+    "AIUsageLog",
     "Resume",
     "ResumeVersion",
     "ResumeAnalysis",

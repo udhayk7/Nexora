@@ -34,9 +34,12 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_ECHO: bool = False
+    DB_SSL_MODE: Optional[str] = None
 
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_SSL: bool = False
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
@@ -44,15 +47,33 @@ class Settings(BaseSettings):
     STORAGE_LOCAL_PATH: str = "storage/resumes"
     MAX_UPLOAD_SIZE_BYTES: int = 10 * 1024 * 1024  # 10 MB
 
-    # AI Intelligence & Providers
-    AI_PROVIDER: Literal["gemini", "openai", "none"] = "gemini"
-    GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # AI Intelligence, Routing & Providers
+    AI_PROVIDER: Literal["gemini", "openai", "none"] = "openai"
+    AI_PRIMARY_PROVIDER: Literal["openai", "gemini", "none"] = "openai"
+    AI_SECONDARY_PROVIDER: Literal["openai", "gemini", "none"] = "gemini"
+    AI_FALLBACK_TO_DETERMINISTIC: bool = True
+
+    # OpenAI Models
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-4o-mini"  # Economical routine tier
+    OPENAI_STRONG_MODEL: str = "gpt-4o"  # Strong complex/reasoning tier
+
+    # Google Gemini Models
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"  # Economical routine tier
+    GEMINI_STRONG_MODEL: str = "gemini-1.5-pro"  # Strong complex/reasoning tier
+
     AI_MAX_INPUT_CHARS: int = 25000
     AI_REQUEST_TIMEOUT_SECONDS: int = 45
     AI_MAX_RETRIES: int = 2
+
+    # AI Usage & Cost Limits (Server-side budget enforcement)
+    AI_DAILY_BUDGET_USD: float = 10.0
+    AI_MONTHLY_BUDGET_USD: float = 100.0
+    AI_USER_DAILY_TOKEN_LIMIT: int = 150_000
+    AI_USER_DAILY_BUDGET_USD: float = 2.0
+    AI_ENABLE_RESPONSE_CACHE: bool = True
+    AI_RESPONSE_CACHE_TTL_SECONDS: int = 86400
 
     # Job Freshness & Verification
     JOB_FRESHNESS_RECENT_DAYS: int = 7
@@ -103,6 +124,15 @@ class Settings(BaseSettings):
                 )
             if "change_me_in_local_env" in self.DATABASE_URL:
                 raise ValueError("DATABASE_URL contains default placeholder password in production")
+            if "localhost" in self.DATABASE_URL and not self.DEBUG:
+                raise ValueError("DATABASE_URL should not point to localhost in production")
+            if self.GOOGLE_CLIENT_ID and (
+                not self.GMAIL_TOKEN_ENCRYPTION_KEY or len(self.GMAIL_TOKEN_ENCRYPTION_KEY) < 16
+            ):
+                raise ValueError(
+                    "GMAIL_TOKEN_ENCRYPTION_KEY must be configured with at least 16 bytes "
+                    "when Google OAuth is enabled in production"
+                )
         return self
 
     @property

@@ -116,6 +116,17 @@ def protected_view(current_user: User = Depends(get_current_active_user)):
 
 ---
 
+### Production Integrations, Cost Management & OAuth Guidelines
+- **Zero Secrets in Repository & Client Bundles**: API keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`), database passwords, and encryption keys must NEVER be committed to Git, exposed in client bundles, or printed in terminal logs.
+- **Multi-Provider Fallback Invariant**: AI features must never depend on a single vendor. Configure OpenAI as primary and Google Gemini as secondary, with deterministic rule-based fallback when external APIs fail.
+- **Server-Side Budget Enforcement**: Global daily spending ($10.00) and monthly spending ($100.00) must be checked before calling external AI APIs via `AICostManager.check_limits_and_cache()`.
+- **Duplicate Request Deduplication**: Duplicate AI generation requests must be fingerprint-hashed (SHA-256) and cached in Redis for 24 hours to prevent unnecessary external API expenses.
+- **Mandatory Billing Disclaimers**: All cost tracking dashboards and invoice estimators must prominently display the standard billing variance disclaimer.
+- **OAuth Encryption & Immediate Revocation**: OAuth tokens stored in the database must be encrypted with AES-256-GCM. Revocation endpoints must immediately delete encrypted tokens and contact provider revoke endpoints.
+- **Explicit Sending Approvals**: Never send emails or trigger external writes without explicit confirmation (`confirm_send=True`) and recipient format validation.
+
+---
+
 ## Git & Version Control Practices
 
 - Commit messages should be descriptive and conventional (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`).

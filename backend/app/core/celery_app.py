@@ -33,3 +33,15 @@ celery.conf.update(
         },
     },
 )
+
+# Apply optional Redis production security configuration
+if settings.REDIS_PASSWORD:
+    celery.conf.update(
+        broker_transport_options={"password": settings.REDIS_PASSWORD},
+        result_backend_transport_options={"password": settings.REDIS_PASSWORD},
+    )
+if settings.REDIS_SSL:
+    celery.conf.update(
+        broker_use_ssl={"ssl_cert_reqs": None},
+        redis_backend_use_ssl={"ssl_cert_reqs": None},
+    )

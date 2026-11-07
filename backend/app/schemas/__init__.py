@@ -1,5 +1,11 @@
 """Pydantic schemas package."""
 
+from app.schemas.ai_usage import (
+    AICostCheckResult,
+    AIProviderSpendBreakdown,
+    AIUsageRecord,
+    AIUsageSummaryResponse,
+)
 from app.schemas.application import (
     ApplicationActivityCreate,
     ApplicationActivityResponse,
@@ -380,4 +386,8 @@ __all__ = [
     "AgentExecutionRecordResponse",
     "ApprovalActionRequest",
     "ApprovalActionResponse",
+    "AICostCheckResult",
+    "AIProviderSpendBreakdown",
+    "AIUsageRecord",
+    "AIUsageSummaryResponse",
 ]

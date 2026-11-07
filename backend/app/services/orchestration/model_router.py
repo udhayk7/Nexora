@@ -141,11 +141,14 @@ class ModelRouter:
                     "Provide an actionable, structured response synthesizing the agent findings."
                 )
 
-                ai_response = str(
-                    generate_func(prompt=llm_prompt, system_instruction=system_instruction)
-                )
-                token_usage["provider"] = provider.name
-                token_usage["model"] = provider.model_name
+                res = generate_func(prompt=llm_prompt, system_instruction=system_instruction)
+                if isinstance(res, tuple):
+                    ai_response, telemetry = res
+                    token_usage.update(telemetry)
+                else:
+                    ai_response = str(res)
+                    token_usage["provider"] = provider.name
+                    token_usage["model"] = provider.model_name
                 return ai_response.strip(), token_usage
         except Exception as exc:
             logger.info(

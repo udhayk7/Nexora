@@ -1106,6 +1106,40 @@ Consequential operations (`requires_approval=True`):
   - `POST /executions/{record_id}/approval`: Record candidate approval/rejection.
   - `GET /context`: Retrieve lean candidate context projection.
 
+---
+
+## 28. Production Integrations, AI Cost Management & Health Diagnostics (Prompt 24)
+
+### 28.1 Multi-Provider AI Architecture & Model Routing
+Nexora decouples application logic from individual LLM vendors via the `AIProvider` Protocol:
+- **Primary Provider**: OpenAI (`gpt-4o-mini` for routine classification, `gpt-4o` for high-context reasoning).
+- **Secondary Provider**: Google Gemini (`gemini-2.5-flash` for routine tasks, `gemini-1.5-pro` for deep synthesis).
+- **Dynamic Fallback**: `AIProviderFactory` evaluates provider health and configuration. If primary fails or is unconfigured, calls transparently route to the secondary provider, and finally to rule-based deterministic engines.
+- **Structured JSON Parsing**: Both providers enforce structured JSON generation with schema validation and sanitize responses before returning.
+
+### 28.2 Server-Side AI Cost & Budget Management (`AICostManager`)
+Every LLM call is tracked, audited, and constrained server-side:
+- **`AIUsageLog` Entity**: Persists user ID, provider, model, feature name, prompt/completion tokens, estimated cost (USD), latency (ms), request status, and cache hit status.
+- **Platform Budget Ceilings**: Hard spending caps at **$10.00/day** (`AI_DAILY_BUDGET_USD`) and **$100.00/month** (`AI_MONTHLY_BUDGET_USD`). Requests exceeding budget limits raise `AIBudgetExceededError`.
+- **Per-User Quotas**: Daily limit of **150,000 tokens** and **$2.00 spend** per user to prevent abuse or denial-of-service.
+- **Duplicate Request Fingerprinting**: Calculates SHA-256 hash of `(user_id, feature, model, prompt_text)`. Valid responses are cached in Redis for 24 hours (`AI_RESPONSE_CACHE_TTL_SECONDS`), eliminating redundant API costs for repeated requests.
+- **Published Rate Calculations**: Real-time dollar estimation computed per 1M tokens based on standard vendor pricing. User-facing dashboards present an explicit disclaimer regarding billing invoice variances.
+
+### 28.3 External Integrations & Infrastructure Hardening
+- **Gmail OAuth 2.0**: AES-256-GCM token encryption with 12-byte random IVs; CSRF state token verification; mandatory explicit confirmation (`confirm_send=True`); recipient RFC-5322 validation; and zero token leakage in API responses.
+- **PostgreSQL Connection Pooling**: SQLAlchemy pool sizing (default 20, max overflow 10), connection recycling (1800s), and `DB_SSL_MODE` (`prefer`, `require`, `verify-ca`, `verify-full`).
+- **Redis & Celery Queue Security**: Redis password authentication support (`REDIS_PASSWORD`) and optional TLS/SSL transport (`REDIS_SSL=True`).
+- **Job Discovery Adapters**: Status, rate-limit policies, and normalization schemas for 5 adapters: Greenhouse, Lever, Ashby, RSS/Atom XML, Generic JSON.
+
+### 28.4 Centralized Diagnostic Endpoints (`/api/v1/integrations/*`)
+- `GET /integrations/health`: Aggregated health overview across all 6 core services and 5 job source adapters.
+- `POST /integrations/test/{service}`: Safe isolated connection test probe for individual services without exposing credentials.
+- `GET /integrations/ai-usage`: Real-time AI consumption summary, budget utilization percentages, model breakdowns, and recent audit logs.
+- `GET /integrations/job-sources`: Technical capability, rate-limit policies, and deduplication specifications for all discovery adapters.
+
+### 28.5 SaaS Health Dashboard (`/dashboard/integrations`)
+A unified Next.js dashboard providing administrators and candidates with real-time operational transparency, interactive diagnostic ping buttons, budget consumption progress gauges, token breakdown charts, and recent audit logs.
+
 
 
 

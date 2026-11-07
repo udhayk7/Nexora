@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import RedirectResponse
@@ -8,17 +9,26 @@ from app.api.deps import get_current_user, get_db
 from app.core.oauth_state import generate_oauth_state, verify_oauth_state
 from app.models.assistant import GmailConnection
 from app.models.user import User
+from app.schemas.ai_usage import AIUsageSummaryResponse
 from app.schemas.assistant import (
     GmailConnectionStatusResponse,
     GoogleAuthUrlResponse,
     GoogleOAuthCallbackRequest,
 )
+from app.services.ai.cost_manager import AICostManager
 from app.services.gmail_service import GmailService
+from app.services.integration_health_service import IntegrationHealthService
 
-router = APIRouter(prefix="/integrations/google", tags=["Google & Gmail Integration"])
+router = APIRouter(prefix="/integrations", tags=["Integrations & Health"])
+google_router = APIRouter(prefix="/google", tags=["Google & Gmail Integration"])
 
 
-@router.get(
+# ---------------------------------------------------------------------------
+# Google & Gmail OAuth Endpoints (under /api/v1/integrations/google/*)
+# ---------------------------------------------------------------------------
+
+
+@google_router.get(
     "/auth-url",
     response_model=GoogleAuthUrlResponse,
     summary="Generate official Google OAuth 2.0 authorization URL",
@@ -32,7 +42,7 @@ def get_google_auth_url(
     return GoogleAuthUrlResponse(authorization_url=auth_url, state=state)
 
 
-@router.get(
+@google_router.get(
     "/callback",
     summary="Handle Google OAuth 2.0 redirect callback",
 )
@@ -45,8 +55,6 @@ def google_oauth_redirect_callback(
 
     Validates state token to identify user, completes exchange, and redirects to dashboard.
     """
-    # Verify state without current_user dependency since this is a top-level browser redirect
-    # Verify signature first to extract user id
     parts = state.split(".", 1)
     if len(parts) != 2:
         return RedirectResponse(url="/dashboard/application-assistant?error=invalid_oauth_state")
@@ -78,7 +86,7 @@ def google_oauth_redirect_callback(
         )
 
 
-@router.post(
+@google_router.post(
     "/callback",
     response_model=GmailConnectionStatusResponse,
     summary="Exchange Google OAuth code for tokens (SPA callback)",
@@ -102,7 +110,7 @@ def google_oauth_spa_callback(
     )
 
 
-@router.get(
+@google_router.get(
     "/status",
     response_model=GmailConnectionStatusResponse,
     summary="Get connected Gmail account status",
@@ -131,7 +139,7 @@ def get_gmail_status(
     )
 
 
-@router.post(
+@google_router.post(
     "/disconnect",
     summary="Disconnect Gmail account and revoke access",
 )
@@ -142,3 +150,61 @@ def disconnect_gmail_account(
     """Revoke tokens and disconnect user's Gmail account."""
     GmailService.disconnect_account(db=db, user=current_user)
     return {"message": "Gmail account disconnected successfully"}
+
+
+# Mount Google subrouter onto main integrations router
+router.include_router(google_router)
+
+
+# ---------------------------------------------------------------------------
+# Centralized Integration Health & Diagnostic Endpoints (/api/v1/integrations/*)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/health",
+    summary="Get comprehensive status across all external integrations",
+)
+def get_integrations_health(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Inspects status of OpenAI, Gemini, PostgreSQL, Redis, Celery, Gmail, and Job feeds."""
+    return IntegrationHealthService.check_all(db=db, user=current_user)
+
+
+@router.post(
+    "/test/{service}",
+    summary="Safely test connection to a specific integration service",
+)
+def test_integration_service(
+    service: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Performs an isolated diagnostic check for a service without exposing secrets."""
+    return IntegrationHealthService.test_service(service_name=service, db=db, user=current_user)
+
+
+@router.get(
+    "/ai-usage",
+    response_model=AIUsageSummaryResponse,
+    summary="Get AI usage monitoring, token consumption, and estimated spending",
+)
+def get_ai_usage_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AIUsageSummaryResponse:
+    """Aggregates AI consumption metrics, model breakdowns, and budget limits."""
+    return AICostManager.get_usage_summary(db=db)
+
+
+@router.get(
+    "/job-sources",
+    summary="Get operational and rate-limit status for all job discovery adapters",
+)
+def get_job_sources_status(
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Returns technical capability, rate limiting, and verification metadata for job sources."""
+    return IntegrationHealthService._check_job_sources()

@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, Globe, GraduationCap, Layers, Layout, LogOut, SendHorizontal, ShieldCheck, Sparkles, User, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, Globe, GraduationCap, Layers, Layout, LogOut, SendHorizontal, ShieldCheck, Sparkles, User, Users, Zap } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -478,6 +478,26 @@ export default function DashboardPage() {
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               Recruiter intelligence, explainable match ranking, grounded outreach generator (LinkedIn ≤300 chars & Gmail), and relationship CRM.
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/integrations"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <Zap className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                View Health <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              External Integrations & Health
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Live diagnostics for OpenAI & Gemini routing, Celery workers, Gmail OAuth status, and real-time AI spending limits.
             </p>
           </Link>
         </div>

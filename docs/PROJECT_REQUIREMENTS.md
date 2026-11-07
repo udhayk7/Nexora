@@ -139,6 +139,15 @@ Nexora is an AI-powered career discovery and application management platform des
 - Audit Transparency & Tracking: Persists every agent operation, latency, token usage, and candidate approval state in `agent_execution_records`.
 - Dedicated SaaS UI Workspace: `/dashboard/ai-copilot` featuring full conversational thread, live collapsible agent execution traces, structured recommendation cards, candidate approval dialogs, suggested prompt chips, and a right-side candidate context drawer.
 
+### 24. Production Integration & API Configuration (Prompt 24)
+- Production Multi-Provider AI Architecture: Centralized routing supporting OpenAI (`gpt-4o-mini` routine, `gpt-4o` strong) as primary and Google Gemini (`gemini-2.5-flash` routine, `gemini-1.5-pro` strong) as secondary with automated fallback.
+- Server-Side AI Budget & Cost Management: Enforces daily ($10.00) and monthly ($100.00) platform budget ceilings, per-user daily token limits (150,000 tokens), SHA-256 duplicate request fingerprint caching, and persistent audit logging in `ai_usage_logs`.
+- Google OAuth 2.0 & Gmail Integration: Tamper-proof OAuth state tokens, AES-256-GCM token encryption at rest, explicit candidate confirmation (`confirm_send=True`), and RFC-5322 recipient validation.
+- Database & Redis Production Hardening: PostgreSQL connection pooling with `DB_SSL_MODE` enforcement; Redis password authentication and TLS/SSL transport security for Celery workers.
+- Job Discovery Operational Verification: Status, rate-limit policies, and normalization specifications for 5 automated adapters (Greenhouse, Lever, Ashby, RSS/Atom, Generic JSON).
+- Centralized Diagnostic Health Endpoints: `/api/v1/integrations/health`, `/test/{service}`, `/ai-usage`, and `/job-sources`.
+- Dedicated Health & Cost Dashboard: SaaS page at `/dashboard/integrations` displaying real-time service health, live ping probes, budget progress bars, token consumption breakdowns, and recent execution audit logs.
+
 ---
 
 ## Non-Functional Requirements

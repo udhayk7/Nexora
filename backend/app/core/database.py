@@ -33,6 +33,9 @@ def create_db_engine(database_url: str, is_test: bool = False, echo: bool = Fals
         "echo": echo,
     }
 
+    if settings.DB_SSL_MODE and not is_test:
+        engine_kwargs["connect_args"] = {"sslmode": settings.DB_SSL_MODE}
+
     if is_test:
         engine_kwargs["poolclass"] = NullPool
     else:

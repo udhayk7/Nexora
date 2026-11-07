@@ -4218,14 +4218,109 @@ export const copilotApi = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Production Integrations, Diagnostics & AI Usage Monitoring
+// ---------------------------------------------------------------------------
 
+export interface IntegrationServiceHealth {
+  status: "connected" | "degraded" | "unconfigured" | "disconnected" | "error" | "operational" | string;
+  service: string;
+  is_configured?: boolean;
+  provider?: string;
+  model?: string;
+  latency_ms?: number;
+  message?: string;
+  pool_size?: number;
+  max_overflow?: number;
+  active_connections?: number;
+  connected_workers?: number;
+  worker_names?: string[];
+  broker_transport?: string;
+  email?: string | null;
+  scopes?: string[];
+  is_client_configured?: boolean;
+  is_connected?: boolean;
+  connected_at?: string | null;
+  last_used_at?: string | null;
+}
 
+export interface JobSourceAdapterInfo {
+  name: string;
+  type: string;
+  auth_required: boolean;
+  status: string;
+  endpoint_pattern: string;
+  rate_limit_policy: string;
+  normalization: string;
+  deduplication: string;
+}
 
+export interface IntegrationsHealthOverview {
+  timestamp: string;
+  environment: string;
+  openai: IntegrationServiceHealth;
+  gemini: IntegrationServiceHealth;
+  postgres: IntegrationServiceHealth;
+  redis: IntegrationServiceHealth;
+  celery: IntegrationServiceHealth;
+  gmail: IntegrationServiceHealth;
+  job_sources: Record<string, JobSourceAdapterInfo>;
+}
 
+export interface AIUsageBreakdownItem {
+  requests_count: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+}
 
+export interface AIUsageLogEntry {
+  id: string;
+  user_id?: string | null;
+  provider: string;
+  model: string;
+  feature: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  estimated_cost_usd: number;
+  request_status: string;
+  latency_ms: number;
+  cache_hit: boolean;
+  created_at: string;
+}
 
+export interface AIUsageSummaryData {
+  total_requests: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  total_estimated_cost_usd: number;
+  daily_budget_usd: number;
+  monthly_budget_usd: number;
+  daily_spend_usd: number;
+  monthly_spend_usd: number;
+  daily_budget_percent: number;
+  monthly_budget_percent: number;
+  by_provider: Record<string, AIUsageBreakdownItem>;
+  by_model: Record<string, AIUsageBreakdownItem>;
+  by_feature: Record<string, AIUsageBreakdownItem>;
+  recent_logs: AIUsageLogEntry[];
+  disclaimer: string;
+}
 
+export interface JobSourcesResponse {
+  timestamp: string;
+  adapters: Record<string, JobSourceAdapterInfo>;
+  compliance_notes: string;
+}
 
-
-
+export const integrationsApi = {
+  getHealth: () => apiClient<IntegrationsHealthOverview>("/integrations/health"),
+  testService: (service: string) =>
+    apiClient<IntegrationServiceHealth>(`/integrations/test/${service}`, {
+      method: "POST",
+    }),
+  getAIUsage: () => apiClient<AIUsageSummaryData>("/integrations/ai-usage"),
+  getJobSources: () => apiClient<JobSourcesResponse>("/integrations/job-sources"),
+};
 
