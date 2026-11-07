@@ -8,9 +8,12 @@ from unittest.mock import patch
 from urllib.robotparser import RobotFileParser
 
 import pytest
+import redis
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.errors import AppError
+from app.core.rate_limit import _get_redis_client
 from app.core.security import hash_password
 from app.models.company import Company
 from app.models.company_intelligence import (
@@ -1276,18 +1279,264 @@ def test_concurrent_requests_respect_domain_pacing():
 
     # Launch 4 concurrent threads hitting the same domain at the exact same moment
     def worker(path: str):
-        with patch("time.sleep", side_effect=mock_sleep_handler):
-            enforcer.apply_rate_limit(f"{target_domain}/{path}")
+        enforcer.apply_rate_limit(f"{target_domain}/{path}")
 
-    threads = [threading.Thread(target=worker, args=(f"p{i}",)) for i in range(4)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    with patch("time.sleep", side_effect=mock_sleep_handler):
+        threads = [threading.Thread(target=worker, args=(f"p{i}",)) for i in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
     # The 4 threads must receive non-overlapping staggered slots: 0.0s, 2.0s, 4.0s, 6.0s
     assert len(sleep_calls) == 3
     assert sorted(sleep_calls) == [2.0, 4.0, 6.0]
+
+
+# ============================================================================
+# Distributed Redis Coordination Tests (Prompt Regression Suite)
+# ============================================================================
+
+
+def test_redis_pacing_multiple_adapters_sharing_domain():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://redis-shared-adapter.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 3\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    web_adapter = OfficialWebsiteAdapter(fetcher=SSRFSafeFetcher())
+    blog_adapter = EngineeringBlogAdapter(fetcher=SSRFSafeFetcher())
+
+    with patch("time.sleep") as mock_sleep:
+        # First adapter requests target domain
+        web_adapter.fetcher.robots_enforcer.apply_rate_limit(f"{target_domain}/about")
+        mock_sleep.assert_not_called()
+        assert web_adapter.fetcher.robots_enforcer.last_coordination_mode == "redis_distributed"
+
+        # Second adapter requests same domain via Redis
+        blog_adapter.fetcher.robots_enforcer.apply_rate_limit(f"{target_domain}/blog")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 3.0
+
+    # Verify Redis key and TTL
+    r = _get_redis_client()
+    assert r is not None
+    redis_key = f"nexora:crawl_pacing:{target_domain}"
+    assert r.exists(redis_key) == 1
+    ttl = r.ttl(redis_key)
+    assert ttl > 0
+
+
+def test_redis_pacing_multiple_simulated_workers():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://multi-worker-redis.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 5\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    # Worker 1 and Worker 2 instances in separate processes sharing Redis
+    worker_1 = RobotsPolicyEnforcer()
+    worker_2 = RobotsPolicyEnforcer()
+
+    base_time = 1000.0
+
+    with (
+        patch("time.sleep") as mock_sleep,
+        patch("time.time", side_effect=[base_time, base_time + 1.0]),
+    ):
+        # Worker 1 requests at t = 1000.0
+        worker_1.apply_rate_limit(f"{target_domain}/page1")
+        mock_sleep.assert_not_called()
+
+        # Worker 2 requests at t = 1001.0 -> must wait 4.0s (scheduled at 1005.0)
+        worker_2.apply_rate_limit(f"{target_domain}/page2")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 4.0
+
+
+def test_redis_pacing_concurrent_slot_reservations():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://concurrent-redis.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 2.5\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+    sleep_calls: list[float] = []
+    lock = threading.Lock()
+
+    def mock_sleep_handler(secs: float):
+        with lock:
+            sleep_calls.append(round(secs, 1))
+
+    def worker(idx: int):
+        enforcer.apply_rate_limit(f"{target_domain}/item_{idx}")
+
+    with patch("time.sleep", side_effect=mock_sleep_handler):
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+    # 5 threads: slots at t+0, t+2.5, t+5.0, t+7.5, t+10.0
+    # First thread wait is 0; remaining 4 threads wait [2.5, 5.0, 7.5, 10.0]
+    assert len(sleep_calls) == 4
+    assert sorted(sleep_calls) == [2.5, 5.0, 7.5, 10.0]
+
+
+def test_redis_pacing_different_domains_independent():
+    RobotsPolicyEnforcer.reset_shared_state()
+    domain_a = "https://domain-alpha.com"
+    domain_b = "https://domain-beta.com"
+
+    rp = RobotFileParser()
+    rp.parse(["User-agent: *", "Crawl-delay: 4"])
+    RobotsPolicyEnforcer._shared_cache[domain_a] = (rp, "parsed", time.time(), "4")
+    RobotsPolicyEnforcer._shared_cache[domain_b] = (rp, "parsed", time.time(), "4")
+
+    enforcer = RobotsPolicyEnforcer()
+
+    with patch("time.sleep") as mock_sleep:
+        # Request Domain A: no sleep
+        enforcer.apply_rate_limit(f"{domain_a}/feed")
+        mock_sleep.assert_not_called()
+
+        # Immediate request to Domain B: independent schedule, must NOT wait for Domain A
+        enforcer.apply_rate_limit(f"{domain_b}/feed")
+        mock_sleep.assert_not_called()
+
+        # Second request to Domain A: must wait 4.0s
+        enforcer.apply_rate_limit(f"{domain_a}/next")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 4.0
+
+    # Verify keys are separate
+    r = _get_redis_client()
+    assert r is not None
+    assert r.exists(f"nexora:crawl_pacing:{domain_a}") == 1
+    assert r.exists(f"nexora:crawl_pacing:{domain_b}") == 1
+
+
+def test_redis_pacing_crawl_delay_changes_after_robots_refresh():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://delay-change.org"
+
+    # Initial robots.txt: Crawl-delay: 2
+    rp1 = RobotFileParser()
+    rp1.parse(["User-agent: *", "Crawl-delay: 2"])
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp1, "parsed", time.time(), "2")
+
+    enforcer = RobotsPolicyEnforcer()
+    sim_time = 5000.0
+
+    def mock_time():
+        return sim_time
+
+    with (
+        patch("time.sleep") as mock_sleep,
+        patch("time.time", side_effect=mock_time),
+    ):
+        # Page 1 at t = 5000.0: scheduled at 5000.0 (no sleep)
+        enforcer.apply_rate_limit(f"{target_domain}/page1")
+        mock_sleep.assert_not_called()
+
+        # Page 2 arrives concurrently at t = 5000.0: scheduled at 5002.0 (waits 2.0s)
+        enforcer.apply_rate_limit(f"{target_domain}/page2")
+        assert round(mock_sleep.call_args[0][0], 1) == 2.0
+
+        # Now simulate robots.txt refresh with new Crawl-delay: 6
+        rp2 = RobotFileParser()
+        rp2.parse(["User-agent: *", "Crawl-delay: 6"])
+        RobotsPolicyEnforcer._shared_cache[target_domain] = (rp2, "parsed", sim_time, "6")
+
+        # Advance simulated time to t = 5004.0
+        sim_time = 5004.0
+
+        # Page 3 arrives at t = 5004.0: scheduled at 5004.0 (no sleep)
+        enforcer.apply_rate_limit(f"{target_domain}/page3")
+
+        # Page 4 arrives concurrently at t = 5004.0: scheduled at 5010.0 (waits 6.0s)
+        enforcer.apply_rate_limit(f"{target_domain}/page4")
+        assert round(mock_sleep.call_args[0][0], 1) == 6.0
+
+
+def test_redis_pacing_redis_unavailable_or_timeout_behavior():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://fallback-test.com"
+
+    rp = RobotFileParser()
+    rp.parse(["User-agent: *", "Crawl-delay: 1"])
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), "1")
+
+    # 1. Conservative fallback when use_redis=False (Redis unreachable)
+    enforcer_fallback = RobotsPolicyEnforcer(use_redis=False)
+    with patch("time.sleep") as mock_sleep:
+        enforcer_fallback.apply_rate_limit(f"{target_domain}/p1")
+        mock_sleep.assert_not_called()
+        assert enforcer_fallback.last_coordination_mode == "degraded_conservative_local"
+
+        # Next call uses conservative fallback floor (max(1.0, 2.0) = 2.0s)
+        enforcer_fallback.apply_rate_limit(f"{target_domain}/p2")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 2.0
+
+    # 2. Redis operation timeout / connection error handling
+    class MockFailingRedis:
+        def eval(self, *args, **kwargs):
+            raise redis.ConnectionError("Redis connection refused")
+
+    enforcer_failing = RobotsPolicyEnforcer(redis_client=MockFailingRedis())
+    with patch("time.sleep") as mock_sleep:
+        enforcer_failing.apply_rate_limit(f"{target_domain}/p3")
+        assert enforcer_failing.last_coordination_mode == "degraded_conservative_local"
+
+    # 3. Deferral mode when defer_on_coordination_failure is True
+    enforcer_defer = RobotsPolicyEnforcer(
+        redis_client=MockFailingRedis(), defer_on_coordination_failure=True
+    )
+    with pytest.raises(AppError) as exc_info:
+        enforcer_defer.apply_rate_limit(f"{target_domain}/p4")
+    assert exc_info.value.code == "CRAWL_COORDINATION_DEFERRED"
+
+
+def test_redis_pacing_expired_coordination_keys():
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://expired-key-test.com"
+
+    rp = RobotFileParser()
+    rp.parse(["User-agent: *", "Crawl-delay: 3"])
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), "3")
+
+    enforcer = RobotsPolicyEnforcer()
+    r = _get_redis_client()
+    assert r is not None
+
+    with patch("time.sleep") as mock_sleep:
+        # First request sets key
+        enforcer.apply_rate_limit(f"{target_domain}/page1")
+        mock_sleep.assert_not_called()
+
+        redis_key = f"nexora:crawl_pacing:{target_domain}"
+        assert r.exists(redis_key) == 1
+
+        # Simulate key expiration (TTL elapsed) by deleting key
+        r.delete(redis_key)
+        assert r.exists(redis_key) == 0
+
+        # Next request after expiration proceeds immediately without waiting
+        enforcer.apply_rate_limit(f"{target_domain}/page2")
+        mock_sleep.assert_not_called()
 
 
 def test_oversized_and_malformed_source_handling():

@@ -22,6 +22,8 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 
+from app.core.errors import AppError
+from app.core.rate_limit import _get_redis_client
 from app.core.url_validator import (
     SSRFSafeTransport,
     extract_normalized_domain,
@@ -204,6 +206,28 @@ def extract_crawl_delay_directive(robots_text: str, target_ua: str = "NexoraBot"
     return None
 
 
+_REDIS_PACING_LUA_SCRIPT = """
+local current_time = tonumber(ARGV[1])
+local delay = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
+
+local last_booked = redis.call('GET', KEYS[1])
+local scheduled_time = current_time
+
+if last_booked then
+    local last_time = tonumber(last_booked)
+    if last_time and last_time > current_time then
+        scheduled_time = last_time
+    end
+end
+
+local next_allowed = scheduled_time + delay
+redis.call('SET', KEYS[1], string.format('%.4f', next_allowed), 'EX', ttl)
+
+return string.format('%.4f', scheduled_time)
+"""
+
+
 class RobotsPolicyEnforcer:
     """Retrieves, parses, caches robots.txt policies, and enforces domain crawl rules.
 
@@ -215,11 +239,14 @@ class RobotsPolicyEnforcer:
        (e.g., 401/403/5xx or network failure), crawling that domain is DISALLOWED.
        HTTP 404 indicates no restrictions per standard conventions.
     5. Enforces domain-level request pacing respecting full Crawl-delay directives (never capped
-       below the site's valid directive) with thread-safe atomic reservation preventing
-       concurrency races across all adapters sharing the domain.
-    6. Does not bypass anti-bot, paywalls, or CAPTCHA protections.
+       below the site's valid directive) using Redis Lua script atomic reservation across
+       FastAPI and Celery worker processes.
+    6. Safely handles Redis unavailability via documented conservative local pacing fallback
+       without exposing secrets or claiming false global coordination.
+    7. Does not bypass anti-bot, paywalls, or CAPTCHA protections.
     """
 
+    CONSERVATIVE_FALLBACK_FLOOR: float = 2.0
     _shared_lock = threading.Lock()
     _shared_cache: dict[str, tuple[Any, ...]] = {}
     _domain_next_allowed_time: dict[str, float] = {}
@@ -230,11 +257,25 @@ class RobotsPolicyEnforcer:
         cache_ttl_seconds: float = 3600.0,
         default_crawl_delay: float = 0.5,
         max_crawl_delay: float = 60.0,
+        redis_client: Optional[Any] = None,
+        use_redis: bool = True,
+        defer_on_coordination_failure: bool = False,
     ) -> None:
         self.cache_ttl = cache_ttl_seconds
         self.default_crawl_delay = default_crawl_delay
         self.max_crawl_delay = max_crawl_delay
         self.user_agent = "NexoraBot"
+        self._redis_client = redis_client
+        self.use_redis = use_redis
+        self.defer_on_coordination_failure = defer_on_coordination_failure
+        self.last_coordination_mode: str = "unknown"
+
+    def _get_redis_client(self) -> Optional[Any]:
+        if not self.use_redis:
+            return None
+        if self._redis_client is not None:
+            return self._redis_client
+        return _get_redis_client()
 
     @property
     def _cache(self) -> dict[str, tuple[Any, ...]]:
@@ -251,20 +292,30 @@ class RobotsPolicyEnforcer:
         return self._domain_last_request_time
 
     @classmethod
-    def reset_shared_state(cls) -> None:
-        """Clear cached robots policies and pacing schedules across all adapters."""
+    def reset_shared_state(cls, redis_client: Optional[Any] = None) -> None:
+        """Clear cached robots policies and pacing schedules across all adapters and Redis."""
         with cls._shared_lock:
             cls._shared_cache.clear()
             cls._domain_next_allowed_time.clear()
             cls._domain_last_request_time.clear()
+        r = redis_client or _get_redis_client()
+        if r is not None:
+            try:
+                keys = r.keys("nexora:crawl_pacing:*")
+                if keys:
+                    r.delete(*keys)
+            except Exception:
+                pass
 
     def reset(self) -> None:
         """Reset state for this enforcer and shared registry."""
-        self.reset_shared_state()
+        self.reset_shared_state(self._get_redis_client())
 
     def get_domain_key(self, url: str) -> str:
         parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}".lower()
+        # Strip credentials (user:password@) and lowercase host
+        host = parsed.netloc.split("@")[-1].lower()
+        return f"{parsed.scheme}://{host}"
 
     def get_crawl_delay(self, url: str) -> float:
         """Extract and validate the domain's Crawl-delay directive.
@@ -389,11 +440,24 @@ class RobotsPolicyEnforcer:
                 self._shared_cache[domain_key] = (None, "robots_fetch_failed", now, None)
             return False, f"robots_fetch_failed: HTTP {res.status_code}"
 
+    def _apply_conservative_local_pacing(self, domain_key: str, delay: float) -> float:
+        """Conservative fallback when distributed coordination is unavailable."""
+        self.last_coordination_mode = "degraded_conservative_local"
+        effective_delay = max(delay, self.CONSERVATIVE_FALLBACK_FLOOR)
+        with self._shared_lock:
+            now = time.time()
+            scheduled_time = max(now, self._domain_next_allowed_time.get(domain_key, 0.0))
+            wait_seconds = max(0.0, scheduled_time - now)
+            self._domain_next_allowed_time[domain_key] = scheduled_time + effective_delay
+            self._domain_last_request_time[domain_key] = scheduled_time
+        return wait_seconds
+
     def apply_rate_limit(self, url: str) -> float:
         """Enforce domain-level pacing respecting full Crawl-delay directives.
 
-        Prevents concurrency races across all adapters by atomically reserving
-        execution timestamps under a shared thread-safe lock.
+        Atomically reserves request slots using Redis across all workers.
+        If Redis is unreachable, applies documented conservative local pacing
+        without falsely claiming global coordination.
         Returns the duration slept in seconds.
         """
         domain_key = self.get_domain_key(url)
@@ -401,13 +465,63 @@ class RobotsPolicyEnforcer:
             return 0.0
 
         delay = self.get_crawl_delay(url)
+        redis_client = self._get_redis_client()
+        wait_seconds = 0.0
 
-        with self._shared_lock:
+        if redis_client is not None:
+            # Shared key per normalized domain; no paths, credentials, or params
+            redis_key = f"nexora:crawl_pacing:{domain_key}"
+            ttl = max(int(delay * 3), 300)
             now = time.time()
-            scheduled_time = max(now, self._domain_next_allowed_time.get(domain_key, 0.0))
-            wait_seconds = scheduled_time - now
-            self._domain_next_allowed_time[domain_key] = scheduled_time + delay
-            self._domain_last_request_time[domain_key] = scheduled_time
+            try:
+                scheduled_str = redis_client.eval(
+                    _REDIS_PACING_LUA_SCRIPT,
+                    1,
+                    redis_key,
+                    f"{now:.4f}",
+                    f"{delay:.4f}",
+                    str(ttl),
+                )
+                scheduled_time = float(scheduled_str)
+                wait_seconds = max(0.0, scheduled_time - now)
+                # Ignore sub-millisecond conversion jitter
+                if wait_seconds < 0.002:
+                    wait_seconds = 0.0
+                with self._shared_lock:
+                    self._domain_last_request_time[domain_key] = scheduled_time
+                    self._domain_next_allowed_time[domain_key] = scheduled_time + delay
+                self.last_coordination_mode = "redis_distributed"
+            except Exception as exc:
+                if self.defer_on_coordination_failure:
+                    logger.error(
+                        "Distributed crawl coordination failed for %s and deferral requested: %s",
+                        domain_key,
+                        type(exc).__name__,
+                    )
+                    raise AppError(
+                        message=f"Distributed crawl coordination unavailable for {domain_key}",
+                        code="CRAWL_COORDINATION_DEFERRED",
+                        status_code=503,
+                    ) from exc
+                logger.warning(
+                    "Distributed crawl coordination unavailable for domain %s: %s. "
+                    "Falling back to conservative local pacing; coordination degraded.",
+                    domain_key,
+                    type(exc).__name__,
+                )
+                wait_seconds = self._apply_conservative_local_pacing(domain_key, delay)
+        else:
+            if self.defer_on_coordination_failure:
+                raise AppError(
+                    message=f"Distributed crawl coordination unavailable for {domain_key}",
+                    code="CRAWL_COORDINATION_DEFERRED",
+                    status_code=503,
+                )
+            logger.info(
+                "Redis client unavailable for domain %s. Using conservative local pacing.",
+                domain_key,
+            )
+            wait_seconds = self._apply_conservative_local_pacing(domain_key, delay)
 
         if wait_seconds > 0.0:
             time.sleep(wait_seconds)
