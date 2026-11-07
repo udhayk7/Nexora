@@ -128,4 +128,3 @@ def compile_cover_letter_to_pdf(
 
     page_count = len(re.findall(rb"/Type\s*/Page\b", pdf_bytes)) or 1
     return pdf_bytes, page_count
-

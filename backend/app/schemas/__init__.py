@@ -40,6 +40,23 @@ from app.schemas.assistant import (
     QAItem,
 )
 from app.schemas.health import HealthResponse
+from app.schemas.interview_prep import (
+    InterviewAnalyticsResponse,
+    InterviewAnswerDetail,
+    InterviewAnswerSubmitRequest,
+    InterviewEvaluationDetail,
+    InterviewNoteCreateRequest,
+    InterviewNoteResponse,
+    InterviewNoteUpdateRequest,
+    InterviewPreparationPlan,
+    InterviewQuestionDetail,
+    InterviewReminderCreateRequest,
+    InterviewSessionCreateRequest,
+    InterviewSessionDetail,
+    InterviewSessionSummary,
+    ProjectPreparationGenerateRequest,
+    StructuredProjectBreakdown,
+)
 from app.schemas.notification import (
     MarkReadAllResponse,
     NotificationListResponse,
@@ -142,4 +159,19 @@ __all__ = [
     "ApplicationQAGenerateRequest",
     "ApplicationQAResponse",
     "PortalSubmitConfirmationRequest",
+    "InterviewSessionCreateRequest",
+    "InterviewPreparationPlan",
+    "InterviewSessionSummary",
+    "InterviewSessionDetail",
+    "InterviewQuestionDetail",
+    "InterviewAnswerSubmitRequest",
+    "InterviewAnswerDetail",
+    "InterviewEvaluationDetail",
+    "ProjectPreparationGenerateRequest",
+    "StructuredProjectBreakdown",
+    "InterviewNoteCreateRequest",
+    "InterviewNoteUpdateRequest",
+    "InterviewNoteResponse",
+    "InterviewAnalyticsResponse",
+    "InterviewReminderCreateRequest",
 ]

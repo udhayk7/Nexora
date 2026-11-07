@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     from app.models.application import JobApplication
     from app.models.assistant import ApplicationPreparation, GmailConnection
     from app.models.company import Company
+    from app.models.interview_prep import (
+        InterviewPreparationNote,
+        InterviewPreparationSession,
+    )
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.notification import Notification, UserNotificationPreference
@@ -130,6 +134,16 @@ class User(Base, TimestampMixin):
     )
     application_preparations: Mapped[list["ApplicationPreparation"]] = relationship(
         "ApplicationPreparation",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    interview_sessions: Mapped[list["InterviewPreparationSession"]] = relationship(
+        "InterviewPreparationSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    interview_notes: Mapped[list["InterviewPreparationNote"]] = relationship(
+        "InterviewPreparationNote",
         back_populates="user",
         cascade="all, delete-orphan",
     )

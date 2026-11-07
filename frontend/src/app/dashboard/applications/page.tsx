@@ -18,6 +18,7 @@ import {
   ExternalLink,
   FileText,
   Filter,
+  GraduationCap,
   Layers,
   Link as LinkIcon,
   Loader2,
@@ -1217,12 +1218,22 @@ function ApplicationsContent() {
                         Structured interview rounds, technical tests and candidate feedback
                       </p>
                     </div>
-                    <button
-                      onClick={() => setShowScheduleModal(true)}
-                      className="px-2.5 py-1 text-xs font-semibold rounded bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Schedule Round
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/interview-prep?application_id=${appDetail.id}${
+                          appDetail.job_id ? `&job_id=${appDetail.job_id}` : ""
+                        }`}
+                        className="px-2.5 py-1 text-xs font-semibold rounded bg-orange-600 hover:bg-orange-500 text-white transition flex items-center gap-1 shadow-sm"
+                      >
+                        <GraduationCap className="w-3.5 h-3.5" /> Prep with AI
+                      </Link>
+                      <button
+                        onClick={() => setShowScheduleModal(true)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Schedule Round
+                      </button>
+                    </div>
                   </div>
 
                   {appDetail.interviews.length === 0 ? (

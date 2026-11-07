@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.errors import BadRequestError
 from app.core.oauth_state import generate_oauth_state, verify_oauth_state
 from app.core.security import hash_password
-from app.core.token_encryption import decrypt_token, encrypt_token
+from app.core.token_encryption import TokenEncryptionError, decrypt_token, encrypt_token
 from app.models.analysis import ResumeAnalysis
 from app.models.assistant import (
     GmailConnection,
@@ -190,7 +190,7 @@ def test_token_encryption_roundtrip():
 
 
 def test_token_decryption_invalid():
-    with pytest.raises(InvalidToken):
+    with pytest.raises((InvalidToken, TokenEncryptionError)):
         decrypt_token("invalid-tampered-token")
 
 

@@ -15,6 +15,13 @@ from app.models.assistant import (
 )
 from app.models.base import Base
 from app.models.company import Company, CompanySource, DiscoveryScanLog
+from app.models.interview_prep import (
+    InterviewAnswer,
+    InterviewEvaluation,
+    InterviewPreparationNote,
+    InterviewPreparationSession,
+    InterviewQuestion,
+)
 from app.models.job import Job, JobSource, JobVerification
 from app.models.match import JobMatch, UserMatchingPreference
 from app.models.notification import Notification, UserNotificationPreference
@@ -53,4 +60,9 @@ __all__ = [
     "ApplicationPreparation",
     "CoverLetter",
     "ApplicationEmail",
+    "InterviewPreparationSession",
+    "InterviewQuestion",
+    "InterviewAnswer",
+    "InterviewEvaluation",
+    "InterviewPreparationNote",
 ]

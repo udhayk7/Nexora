@@ -2164,6 +2164,304 @@ export const assistantApi = {
     }),
 };
 
+// ============================================================================
+// Interview Preparation & Coaching Interfaces & API
+// ============================================================================
+
+export interface InterviewSessionCreateRequest {
+  job_id?: string;
+  company_id?: string;
+  application_id?: string;
+  resume_version_id?: string;
+  interview_round?: string;
+  interview_type?: string;
+  difficulty?: string;
+  category?: string;
+  question_count?: number;
+  user_instructions?: string;
+  selected_project_name?: string;
+}
+
+export interface InterviewSessionSummary {
+  id: string;
+  user_id: string;
+  job_id?: string | null;
+  job_title?: string | null;
+  company_name?: string | null;
+  interview_round: string;
+  interview_type: string;
+  difficulty: string;
+  status: string;
+  title: string;
+  total_questions: number;
+  completed_questions: number;
+  average_score?: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+}
+
+export interface InterviewAnswerDetail {
+  id: string;
+  question_id: string;
+  answer_text: string;
+  submitted_code?: string | null;
+  submitted_language?: string | null;
+  word_count: number;
+  time_spent_seconds?: number | null;
+  submitted_at: string;
+  evaluation?: InterviewEvaluationDetail | null;
+}
+
+export interface InterviewEvaluationDetail {
+  id: string;
+  question_id: string;
+  overall_score: number;
+  technical_correctness_score: number;
+  relevance_score: number;
+  completeness_score: number;
+  clarity_score: number;
+  approach_score: number;
+  communication_score: number;
+  strengths: string[];
+  missing_points: string[];
+  suggested_improvements: string[];
+  stronger_answer_example?: string | null;
+  evaluation_feedback?: string | null;
+  evaluated_at: string;
+  is_deterministic_fallback: boolean;
+}
+
+export interface InterviewQuestionDetail {
+  id: string;
+  session_id: string;
+  question_order: number;
+  category: string;
+  difficulty: string;
+  question_text: string;
+  context_hint?: string | null;
+  expected_points: string[];
+  evaluation_criteria?: Record<string, any>;
+  ideal_answer_outline?: string | null;
+  project_name?: string | null;
+  status: string;
+  answer?: InterviewAnswerDetail | null;
+  evaluation?: InterviewEvaluationDetail | null;
+}
+
+export interface InterviewSessionDetail {
+  id: string;
+  user_id: string;
+  job_id?: string | null;
+  company_id?: string | null;
+  application_id?: string | null;
+  resume_version_id?: string | null;
+  title: string;
+  interview_round: string;
+  interview_type: string;
+  difficulty: string;
+  status: string;
+  total_questions: number;
+  completed_questions: number;
+  average_score?: number | null;
+  preparation_plan?: {
+    technical_topics_to_revise?: { topic: string; rationale: string; suggested_focus: string[] }[];
+    relevant_projects_to_explain?: { project_name: string; relevance_to_role: string; talking_points: string[] }[];
+    internship_and_experience_talking_points?: string[];
+    required_technical_skills?: string[];
+    potential_skill_gaps?: { skill_or_requirement: string; status: string; mitigation_strategy: string }[];
+    behavioral_preparation_topics?: { competency: string; prompt_theme: string; relevant_experience_anchor: string }[];
+    company_and_role_context?: { company_name: string; role_title: string; workplace_type: string; key_focus_areas: string[] };
+  } | null;
+  questions: InterviewQuestionDetail[];
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+}
+
+export interface InterviewAnswerSubmitRequest {
+  answer_text: string;
+  submitted_code?: string;
+  submitted_language?: string;
+  time_spent_seconds?: number;
+}
+
+export interface InterviewAnswerSubmitResponse {
+  answer: InterviewAnswerDetail;
+  evaluation: InterviewEvaluationDetail;
+  session_progress: {
+    total_questions: number;
+    completed_questions: number;
+    average_score?: number | null;
+    is_session_complete: boolean;
+  };
+}
+
+export interface ProjectBreakdownResponse {
+  project_name: string;
+  overview_pitch: string;
+  architecture_and_design: string;
+  technical_implementation: string[];
+  key_challenges_and_solutions: { challenge: string; solution: string }[];
+  scalability_and_improvements: string[];
+  candidate_contribution: string;
+  practice_questions: string[];
+  provider: string;
+  model: string;
+  is_fallback: boolean;
+}
+
+export interface InterviewNoteResponse {
+  id: string;
+  user_id: string;
+  session_id?: string | null;
+  application_id?: string | null;
+  note_type: string;
+  title: string;
+  content: string;
+  is_pinned: boolean;
+  is_completed: boolean;
+  checklist_items?: { id: string; text: string; done: boolean }[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InterviewNoteCreateRequest {
+  title: string;
+  content: string;
+  note_type?: string;
+  session_id?: string;
+  application_id?: string;
+  is_pinned?: boolean;
+  is_completed?: boolean;
+  checklist_items?: { id: string; text: string; done: boolean }[];
+}
+
+export interface InterviewNoteUpdateRequest {
+  title?: string;
+  content?: string;
+  note_type?: string;
+  is_pinned?: boolean;
+  is_completed?: boolean;
+  checklist_items?: { id: string; text: string; done: boolean }[];
+}
+
+export interface InterviewAnalyticsResponse {
+  total_sessions_started?: number;
+  total_sessions_completed?: number;
+  total_sessions?: number;
+  completed_sessions?: number;
+  total_questions_attempted: number;
+  overall_average_score: number;
+  technical_average_score: number;
+  behavioral_average_score: number;
+  category_performance?: Record<string, number> | {
+    category: string;
+    questions_attempted: number;
+    average_score: number;
+  }[];
+  difficulty_performance?: Record<string, number>;
+  strong_areas: string[];
+  weak_areas: string[];
+  recommended_revision_topics: string[];
+  score_trend?: {
+    session_id: string;
+    session_title: string;
+    completed_at: string;
+    average_score: number;
+  }[];
+  score_progression?: {
+    session_id: string;
+    title: string;
+    score: number;
+    date: string;
+  }[];
+}
+
+export interface InterviewReminderCreateRequest {
+  session_id?: string;
+  application_id?: string;
+  scheduled_at: string;
+  reminder_type: string;
+  custom_message?: string;
+}
+
+export const interviewPrepApi = {
+  createSession: (data: InterviewSessionCreateRequest) =>
+    apiClient<InterviewSessionDetail>("/interview-prep/sessions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listSessions: (status?: string, limit: number = 50, offset: number = 0) => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    params.append("limit", limit.toString());
+    params.append("offset", offset.toString());
+    return apiClient<InterviewSessionSummary[]>(`/interview-prep/sessions?${params.toString()}`);
+  },
+
+  getSession: (sessionId: string) =>
+    apiClient<InterviewSessionDetail>(`/interview-prep/sessions/${sessionId}`),
+
+  submitAnswer: (sessionId: string, questionId: string, data: InterviewAnswerSubmitRequest) =>
+    apiClient<InterviewAnswerDetail>(
+      `/interview-prep/sessions/${sessionId}/questions/${questionId}/answer`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+
+  getProjectBreakdown: (projectName: string, jobId?: string, instructions?: string) =>
+    apiClient<ProjectBreakdownResponse>("/interview-prep/project-breakdown", {
+      method: "POST",
+      body: JSON.stringify({
+        project_name: projectName,
+        job_id: jobId || null,
+        user_instructions: instructions || null,
+      }),
+    }),
+
+  listNotes: (noteType?: string, sessionId?: string, applicationId?: string) => {
+    const params = new URLSearchParams();
+    if (noteType) params.append("note_type", noteType);
+    if (sessionId) params.append("session_id", sessionId);
+    if (applicationId) params.append("application_id", applicationId);
+    const qs = params.toString();
+    return apiClient<InterviewNoteResponse[]>(`/interview-prep/notes${qs ? `?${qs}` : ""}`);
+  },
+
+  createNote: (data: InterviewNoteCreateRequest) =>
+    apiClient<InterviewNoteResponse>("/interview-prep/notes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateNote: (noteId: string, data: InterviewNoteUpdateRequest) =>
+    apiClient<InterviewNoteResponse>(`/interview-prep/notes/${noteId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  deleteNote: (noteId: string) =>
+    apiClient<{ deleted: boolean; id: string }>(`/interview-prep/notes/${noteId}`, {
+      method: "DELETE",
+    }),
+
+  getAnalytics: () => apiClient<InterviewAnalyticsResponse>("/interview-prep/analytics"),
+
+  scheduleReminder: (data: InterviewReminderCreateRequest) =>
+    apiClient<{ scheduled: boolean; notification_id: string; scheduled_at: string }>(
+      "/interview-prep/reminders",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ),
+};
+
+
 
 
 

@@ -64,4 +64,3 @@ def decrypt_token(encrypted_token: Optional[str]) -> Optional[str]:
         raise TokenEncryptionError("Decryption failed: invalid or corrupt token") from exc
     except Exception as exc:
         raise TokenEncryptionError("Failed to decrypt OAuth token") from exc
-

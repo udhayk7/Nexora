@@ -44,6 +44,19 @@ Nexora is an AI-powered career discovery and application management platform des
 - Strict duplicate-send prevention and 10MB total attachment size limits.
 - External application portal checklist assistance with submission confirmation strictly decoupled from portal URL opens.
 
+### 7. AI Interview Preparation & Interview Coach (Completed — Prompt 16)
+- Personalized Interview Preparation Plans grounded in verified candidate resume, target job requisition, company context, and interview stage.
+- Technical topics to revise, relevant projects to explain, internship/work experience talking points, required technical skills, and potential skill gaps with mitigation strategies.
+- AI Interview Question Generator with multi-provider abstraction and deterministic fallback covering 10 categories (`technical`, `coding_problem_solving`, `backend_python`, `frontend_fullstack`, `ai_ml_genai`, `database_sql`, `system_design`, `project_deep_dive`, `internship_experience`, `behavioral_hr`) across 3 difficulty tiers (`beginner`, `intermediate`, `advanced`).
+- Question-by-question Interactive Mock Interview workspace with context hints, rubric previews, and code input support.
+- 6-dimension standardized rubric evaluation ($0.30 \times \text{correctness} + 0.20 \times \text{relevance} + 0.20 \times \text{completeness} + 0.10 \times \text{clarity} + 0.10 \times \text{approach} + 0.10 \times \text{communication}$).
+- Safe Static Code Analyzer (`SafeStaticCodeAnalyzer`) using Python AST parsing; arbitrary code execution on the application server is strictly prohibited.
+- Resume-Based Project Deep-Dive Studio with STAR structured architectural breakdown, trade-off analysis, bottlenecks, and practice questions.
+- Interview Performance Analytics dashboard aggregating real completion metrics, strong areas ($\ge 75\%$), weak areas ($< 70\%$), and score progression trends.
+- Interview Notes and Preparation Checklist manager with pinned notes and category filtering.
+- Automated preparation reminder alarms integrated into existing `NotificationService` and Celery infrastructure.
+- Direct shortcut from Application Tracker interview rounds without automatically modifying application status.
+
 ---
 
 ## Non-Functional Requirements

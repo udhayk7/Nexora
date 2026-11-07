@@ -563,6 +563,51 @@ Nexora's AI Job Intelligence and Personalized Recommendations system pairs the d
 
 ---
 
+## 20. AI Interview Preparation & Interview Coach Architecture
+
+### 20.1 Overview & System Invariants
+The AI Interview Preparation & Coaching module provides personalized preparation sessions grounded in the candidate's verified resume analysis, target job requisition, hiring company profile, and application stage.
+
+Core invariants enforced:
+1. **Zero Fabrication**: All preparation plans, project deep-dive breakdowns, and practice questions strictly anchor to verified skills, projects, and experiences evidenced in `ResumeAnalysisResult`.
+2. **Safe Code Evaluation**: Submitted code is evaluated strictly statically (`SafeStaticCodeAnalyzer`) using Python's standard `ast` parser to inspect functions, control loops, and syntax errors. Arbitrary code is NEVER executed on the application server.
+3. **Multi-Category & Tier Calibration**: 10 specialized categories (`technical`, `coding_problem_solving`, `backend_python`, `frontend_fullstack`, `ai_ml_genai`, `database_sql`, `system_design`, `project_deep_dive`, `internship_experience`, `behavioral_hr`) across 3 difficulty tiers (`beginner`, `intermediate`, `advanced`).
+4. **Standardized Rubric Scoring**: Candidate answers are scored on a 0-100 scale using a 6-dimension weighted rubric:
+   $$\text{Overall Score} = 0.30 \times \text{Correctness} + 0.20 \times \text{Relevance} + 0.20 \times \text{Completeness} + 0.10 \times \text{Clarity} + 0.10 \times \text{Approach} + 0.10 \times \text{Communication}$$
+5. **Decoupled Application Status**: Mock interview scores are for preparation only; they never automatically alter the application's actual stage or outcome in the tracker.
+
+### 20.2 Data Models & Relational Architecture
+- **`InterviewPreparationSession` (`interview_preparation_sessions`)**:
+  - Primary key: `id` (UUIDv4)
+  - Scoped to `user_id`, optional FKs: `job_id`, `company_id`, `application_id`, `resume_version_id`.
+  - Tracks: `interview_round`, `interview_type`, `difficulty`, `status` (`in_progress`, `completed`, `abandoned`), `total_questions`, `completed_questions`, `average_score`, `preparation_plan` (JSONB).
+- **`InterviewQuestion` (`interview_questions`)**:
+  - `session_id`, `question_order` (1-indexed), `category`, `difficulty`, `question_text`, `context_hint`, `expected_points` (JSONB array), `evaluation_criteria` (JSONB), `ideal_answer_outline`, `project_name`.
+- **`InterviewAnswer` (`interview_answers`)**:
+  - `question_id`, `session_id`, `user_id`, `answer_text`, `submitted_code`, `submitted_language`, `word_count`, `time_spent_seconds`.
+- **`InterviewEvaluation` (`interview_evaluations`)**:
+  - One-to-one with `InterviewAnswer`. Stores scores for the 6 rubric dimensions and overall score (0.0 to 100.0).
+  - Feedback lists: `strengths`, `missing_points`, `suggested_improvements`, `stronger_answer_example`, `evaluation_feedback`.
+  - Provider provenance: `provider`, `model`, `is_deterministic_fallback`.
+- **`InterviewPreparationNote` (`interview_preparation_notes`)**:
+  - Scoped to `user_id`, optional `session_id` and `application_id`.
+  - Categories: `topics_to_revise`, `questions_to_ask`, `company_research`, `checklist`, `general`.
+  - Supports pinned status (`is_pinned`) and checklist items (`checklist_items` JSONB).
+
+### 20.3 AI Engine & Fallback Architecture
+- **Plan Generation (`InterviewPrepEngine`)**: Generates structured technical topics, project talking points, internship anchors, and skill gap mitigations.
+- **Question Generation (`InterviewQuestionEngine`)**: Employs prompt templates with structured JSON outputs and `DeterministicQuestionGenerator` featuring curated question banks for all 10 categories and 3 difficulty tiers.
+- **Answer Evaluation (`InterviewEvaluationEngine`)**: Evaluates submissions against rubric expectations with `SafeStaticCodeAnalyzer` and `DeterministicEvaluationEngine`.
+- **Project Deep-Dive Studio (`ProjectPrepEngine`)**: Structures candidate projects into STAR frameworks (pitch, architecture, implementation, bottlenecks, scalability, practice questions).
+
+### 20.4 Performance Analytics & Scheduling
+- **Analytics Aggregator (`InterviewPrepService.get_analytics`)**:
+  - Calculates real metrics from completed evaluations: overall average, technical average, behavioral average, category breakdown, score trends, strong areas ($\ge 75\%$), and weak areas ($< 70\%$).
+- **Reminder Integration**:
+  - Connects to existing `NotificationService` infrastructure to schedule automated reminder alerts with celery background worker execution.
+
+---
+
 ## Token & Cookie Security Strategy
 
 | Aspect | Strategy & Implementation | Tradeoff / Mitigation |

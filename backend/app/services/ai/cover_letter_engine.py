@@ -69,15 +69,19 @@ class DeterministicCoverLetterGenerator:
         projects: list[dict[str, Any]] = []
         if resume_analysis.experience_evidence and resume_analysis.experience_evidence.evidence:
             for ev in resume_analysis.experience_evidence.evidence:
-                projects.append({
-                    "name": ev.section or "Engineering Project",
-                    "description": ev.excerpt,
-                })
+                projects.append(
+                    {
+                        "name": ev.section or "Engineering Project",
+                        "description": ev.excerpt,
+                    }
+                )
         elif resume_analysis.experience_evidence and resume_analysis.experience_evidence.summary:
-            projects.append({
-                "name": "Experience Overview",
-                "description": resume_analysis.experience_evidence.summary,
-            })
+            projects.append(
+                {
+                    "name": "Experience Overview",
+                    "description": resume_analysis.experience_evidence.summary,
+                }
+            )
 
         notable_proj = projects[0] if projects else None
 

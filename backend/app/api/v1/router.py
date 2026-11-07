@@ -6,6 +6,7 @@ from app.api.v1.auth import auth_router
 from app.api.v1.companies import companies_router
 from app.api.v1.discovery import router as discovery_router
 from app.api.v1.integrations import router as integrations_router
+from app.api.v1.interview_prep import router as interview_prep_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.matches import matches_router
 from app.api.v1.notifications import router as notifications_router
@@ -43,3 +44,4 @@ api_router.include_router(discovery_router, prefix="/discovery", tags=["Job Disc
 api_router.include_router(recommendations_router)
 api_router.include_router(assistant_router)
 api_router.include_router(integrations_router)
+api_router.include_router(interview_prep_router)
