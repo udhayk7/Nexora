@@ -368,6 +368,10 @@ class LearningProject(Base, TimestampMixin):
         "LearningRoadmap",
         back_populates="projects",
     )
+    portfolio_projects: Mapped[list["PortfolioProject"]] = relationship(  # type: ignore # noqa: F821
+        "PortfolioProject",
+        back_populates="learning_project",
+    )
 
     __table_args__ = (Index("ix_learning_projects_user_status", "user_id", "status"),)
 

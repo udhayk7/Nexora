@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.learning_roadmap import LearningProject, LearningRoadmap
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.notification import Notification, UserNotificationPreference
+    from app.models.portfolio import Portfolio
     from app.models.recommendation import AIJobMatch
     from app.models.resume import Resume
     from app.models.tailoring import ResumeTailoringSession
@@ -162,5 +163,11 @@ class User(Base, TimestampMixin):
     learning_projects: Mapped[list["LearningProject"]] = relationship(
         "LearningProject",
         back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    portfolio: Mapped[Optional["Portfolio"]] = relationship(
+        "Portfolio",
+        back_populates="user",
+        uselist=False,
         cascade="all, delete-orphan",
     )

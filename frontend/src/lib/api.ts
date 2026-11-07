@@ -425,7 +425,7 @@ export interface FeedIngestResult {
   errors: Array<{ record_index?: number; error: string }>;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 let memoryAccessToken: string | null = null;
 
@@ -3165,6 +3165,348 @@ export const learningRoadmapsApi = {
       body: JSON.stringify(data),
     }),
 };
+
+// ============================================================================
+// 24. PORTFOLIO STUDIO & PROFESSIONAL SHOWCASE (PROMPT 20)
+// ============================================================================
+
+export interface PortfolioEducationItem {
+  institution: string;
+  degree: string;
+  field_of_study?: string | null;
+  start_year?: number | null;
+  end_year?: number | null;
+  highlights: string[];
+}
+
+export interface PortfolioWorkExperienceItem {
+  company: string;
+  role: string;
+  location?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  is_current: boolean;
+  description?: string | null;
+  bullet_points: string[];
+}
+
+export interface PortfolioCertificationItem {
+  name: string;
+  issuer: string;
+  issue_date?: string | null;
+  url?: string | null;
+  credential_id?: string | null;
+}
+
+export interface PortfolioAchievementItem {
+  title: string;
+  description: string;
+  date?: string | null;
+}
+
+export interface PortfolioProfileData {
+  full_name: string;
+  headline: string;
+  avatar_url?: string | null;
+  summary: string;
+  location: string;
+  target_roles: string[];
+  technical_skills: string[];
+  contact_email?: string | null;
+  phone?: string | null;
+  github_url?: string | null;
+  linkedin_url?: string | null;
+  website_url?: string | null;
+  education: PortfolioEducationItem[];
+  work_experience: PortfolioWorkExperienceItem[];
+  certifications: PortfolioCertificationItem[];
+  achievements: PortfolioAchievementItem[];
+}
+
+export interface PortfolioThemeConfig {
+  accent_color: string;
+  font_family: string;
+  dark_mode: string;
+  show_contact_form: boolean;
+  show_view_counter: boolean;
+}
+
+export interface PortfolioSection {
+  id: string;
+  portfolio_id: string;
+  section_type: string;
+  title: string;
+  is_visible: boolean;
+  order_index: number;
+  content_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioProjectItem {
+  id: string;
+  portfolio_id: string;
+  learning_project_id?: string | null;
+  title: string;
+  problem_statement?: string | null;
+  description: string;
+  tech_stack: string[];
+  key_features: string[];
+  architecture_overview?: string | null;
+  candidate_contribution?: string | null;
+  repository_url?: string | null;
+  live_demo_url?: string | null;
+  image_urls: string[];
+  challenges?: string | null;
+  outcomes?: string | null;
+  status: string;
+  is_featured: boolean;
+  is_visible: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioVersionItem {
+  id: string;
+  version_number: number;
+  change_summary?: string | null;
+  created_at: string;
+}
+
+export interface PortfolioDetail {
+  id: string;
+  user_id: string;
+  public_slug: string;
+  title: string;
+  headline?: string | null;
+  is_published: boolean;
+  published_at?: string | null;
+  template_id: string;
+  theme_config: PortfolioThemeConfig;
+  profile_data: PortfolioProfileData;
+  custom_css?: string | null;
+  sections: PortfolioSection[];
+  projects: PortfolioProjectItem[];
+  versions_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublicPortfolioDetail {
+  public_slug: string;
+  title: string;
+  headline?: string | null;
+  template_id: string;
+  theme_config: PortfolioThemeConfig;
+  profile_data: PortfolioProfileData;
+  sections: PortfolioSection[];
+  projects: PortfolioProjectItem[];
+  published_at?: string | null;
+}
+
+export interface ViewTrendPoint {
+  date: string;
+  views: number;
+}
+
+export interface ProjectViewStat {
+  project_id?: string | null;
+  title: string;
+  views: number;
+}
+
+export interface PortfolioAnalytics {
+  total_views: number;
+  project_views: number;
+  downloads_count: number;
+  views_by_date: ViewTrendPoint[];
+  top_viewed_projects: ProjectViewStat[];
+  referrers: Record<string, number>;
+  devices: Record<string, number>;
+}
+
+export interface AIPortfolioAssistResult {
+  suggested_content: string;
+  explanation: string;
+  bullet_points: string[];
+  is_fallback: boolean;
+  grounded_evidence: string[];
+}
+
+export const portfoliosApi = {
+  getMyPortfolio: () =>
+    apiClient<PortfolioDetail>("/portfolios/me"),
+
+  updateProfile: (data: {
+    title?: string;
+    headline?: string;
+    profile_data: PortfolioProfileData;
+  }) =>
+    apiClient<PortfolioDetail>("/portfolios/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  updateTheme: (data: {
+    template_id?: string;
+    theme_config: PortfolioThemeConfig;
+    custom_css?: string;
+  }) =>
+    apiClient<PortfolioDetail>("/portfolios/theme", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  updateSlug: (public_slug: string) =>
+    apiClient<PortfolioDetail>("/portfolios/slug", {
+      method: "PUT",
+      body: JSON.stringify({ public_slug }),
+    }),
+
+  reorderSections: (
+    sections: { id: string; order_index: number; is_visible: boolean }[]
+  ) =>
+    apiClient<PortfolioSection[]>("/portfolios/sections", {
+      method: "PUT",
+      body: JSON.stringify({ sections }),
+    }),
+
+  updateSection: (
+    sectionId: string,
+    data: { title?: string; is_visible?: boolean; order_index?: number }
+  ) =>
+    apiClient<PortfolioSection>(`/portfolios/sections/${sectionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  createProject: (data: {
+    learning_project_id?: string;
+    title: string;
+    problem_statement?: string;
+    description: string;
+    tech_stack?: string[];
+    key_features?: string[];
+    architecture_overview?: string;
+    candidate_contribution?: string;
+    repository_url?: string;
+    live_demo_url?: string;
+    image_urls?: string[];
+    challenges?: string;
+    outcomes?: string;
+    status?: string;
+    is_featured?: boolean;
+    is_visible?: boolean;
+    order_index?: number;
+  }) =>
+    apiClient<PortfolioProjectItem>("/portfolios/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateProject: (
+    projectId: string,
+    data: Partial<{
+      title: string;
+      problem_statement: string;
+      description: string;
+      tech_stack: string[];
+      key_features: string[];
+      architecture_overview: string;
+      candidate_contribution: string;
+      repository_url: string;
+      live_demo_url: string;
+      image_urls: string[];
+      challenges: string;
+      outcomes: string;
+      status: string;
+      is_featured: boolean;
+      is_visible: boolean;
+      order_index: number;
+    }>
+  ) =>
+    apiClient<PortfolioProjectItem>(`/portfolios/projects/${projectId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteProject: (projectId: string) =>
+    apiClient<{ status: string; message: string }>(
+      `/portfolios/projects/${projectId}`,
+      { method: "DELETE" }
+    ),
+
+  importLearningProject: (learningProjectId: string) =>
+    apiClient<PortfolioProjectItem>(
+      `/portfolios/projects/import-learning/${learningProjectId}`,
+      { method: "POST" }
+    ),
+
+  importFromResume: () =>
+    apiClient<PortfolioDetail>("/portfolios/import-resume", {
+      method: "POST",
+    }),
+
+  publish: () =>
+    apiClient<PortfolioDetail>("/portfolios/publish", {
+      method: "POST",
+    }),
+
+  unpublish: () =>
+    apiClient<PortfolioDetail>("/portfolios/unpublish", {
+      method: "POST",
+    }),
+
+  createVersion: (change_summary?: string) =>
+    apiClient<PortfolioVersionItem>("/portfolios/versions", {
+      method: "POST",
+      body: JSON.stringify({ change_summary }),
+    }),
+
+  listVersions: () =>
+    apiClient<PortfolioVersionItem[]>("/portfolios/versions"),
+
+  restoreVersion: (versionId: string) =>
+    apiClient<PortfolioDetail>(`/portfolios/versions/${versionId}/restore`, {
+      method: "POST",
+    }),
+
+  aiAssist: (data: {
+    assist_type: string;
+    current_text?: string;
+    target_role?: string;
+    project_title?: string;
+    tech_stack?: string[];
+    rough_notes?: string;
+  }) =>
+    apiClient<AIPortfolioAssistResult>("/portfolios/ai-assist", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getAnalytics: () =>
+    apiClient<PortfolioAnalytics>("/portfolios/analytics"),
+
+  getPublicPortfolio: (publicSlug: string) =>
+    apiClient<PublicPortfolioDetail>(`/portfolios/public/${publicSlug}`),
+
+  recordPublicEvent: (
+    publicSlug: string,
+    data: { event_type: string; project_id?: string; referrer?: string }
+  ) =>
+    apiClient<{ status: string }>(`/portfolios/public/${publicSlug}/event`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getPublicPdfUrl: (publicSlug: string) =>
+    `${API_BASE}/api/v1/portfolios/public/${publicSlug}/export/pdf`,
+
+  getPublicHtmlUrl: (publicSlug: string) =>
+    `${API_BASE}/api/v1/portfolios/public/${publicSlug}/export/html`,
+};
+
 
 
 

@@ -846,4 +846,69 @@ All endpoints mounted under `/api/v1/learning-roadmaps` with multi-tenant user a
 - `PATCH /api/v1/learning-roadmaps/{id}/status`: Toggles roadmap status (`active`, `paused`).
 - `DELETE /api/v1/learning-roadmaps/{id}`: Deletes roadmap and cascades milestones.
 
+---
+
+## 24. Portfolio Studio & Professional Showcase Architecture
+
+### 24.1 Overview & System Invariants
+The Portfolio Studio & Professional Showcase module enables candidates to create, customize, preview, and publish a recruiter-ready professional portfolio website and downloadable artifacts (PDF resume and offline HTML package) grounded entirely in verified career data, completed learning projects, and technical skills.
+
+Core architectural invariants:
+1. **Zero Fabrication**: All portfolio profiles, project descriptions, and measurable outcomes strictly reflect actual candidate experience and verified project repositories. AI assistance operates under strict grounding invariants and requires explicit user review before saving.
+2. **Privacy by Design**: Public portfolio URLs (`/portfolio/[public_slug]`) expose only explicitly approved content and visible sections. Private account attributes (internal user IDs, password hashes, email verification tokens, application pipeline records, and private learning notes) are strictly excluded from public responses.
+3. **Responsive Multi-Template System**: Features 3 distinctive professional templates:
+   - `minimal`: Clean, typography-driven, recruiter-friendly layout.
+   - `developer`: Code & architecture focused, monospace fonts, tech stack badges, terminal headers, and repository links.
+   - `ai_tech`: AI/ML engineering focused, highlighting models, frameworks, architecture diagrams, and system benchmarks.
+4. **Offline & Multi-Format Exports**: Provides self-contained static HTML (works offline without external CDN dependencies) and high-quality ReportLab A4 PDF export.
+5. **Privacy-Conscious Visitor Analytics**: Tracks aggregate page views, project clicks, and downloads without storing visitor PII, cookies, or IP addresses.
+
+### 24.2 Relational Database Models (`app/models/portfolio.py`)
+- **`Portfolio` (`portfolios`)**: Root entity per user (`user_id` unique). Stores `public_slug`, `title`, `headline`, publication status (`is_published`, `published_at`), `template_id` (`minimal`, `developer`, `ai_tech`), `theme_config` JSONB (colors, typography, dark mode), and structured `profile_data` JSONB.
+- **`PortfolioSection` (`portfolio_sections`)**: Configurable sections (`hero`, `about`, `skills`, `projects`, `experience`, `education`, `certifications`, `contact`) with custom titles, order indices, and visibility flags (`is_visible`).
+- **`PortfolioProject` (`portfolio_projects`)**: Evidence-backed project entries linked to `Portfolio` and optionally to `learning_projects`. Tracks title, problem statement, description, tech stack array, key features array, architecture overview, candidate contribution, repo URL, demo URL, challenges, outcomes, status (`completed`, `in_progress`), featured flag, visibility, and display order.
+- **`PortfolioVersion` (`portfolio_versions`)**: Immutable snapshots of portfolio state (`snapshot_data` JSONB) with incremental version numbers and change summaries, supporting full rollback and restoration.
+- **`PortfolioViewEvent` (`portfolio_view_events`)**: Privacy-conscious event log tracking `event_type` (`page_view`, `project_view`, `pdf_download`, `html_download`), optional `project_id`, normalized `referrer_category` (`direct`, `linkedin`, `github`, `search`, `external`), and `device_category` (`desktop`, `mobile`, `tablet`).
+
+### 24.3 Cross-Module Integrations
+- **Learning Roadmap Module**: Direct one-click import from `learning_projects` (`POST /api/v1/portfolios/projects/import-learning/{id}`), automatically mapping problem statements, tech stacks, architecture summaries, and repository URLs.
+- **Resume Studio Module**: One-click profile bootstrap (`POST /api/v1/portfolios/import-resume`), populating contact info, professional summary, technical skills, and work history directly from the user's latest parsed `ResumeAnalysisResult`.
+
+### 24.4 AI Portfolio Assistant (`AIPortfolioAssistantEngine`)
+- Multi-provider abstraction (`Gemini` & `OpenAI`) with deterministic rule-based fallback.
+- Supports 4 assistance workflows:
+  1. `improve_summary`: Refines executive summaries for clarity and impact while preserving factual boundaries.
+  2. `project_description`: Converts rough technical notes into structured STAR descriptions highlighting problems, architectures, and measurable outcomes.
+  3. `role_tailoring`: Adapts portfolio headline and highlights to align with target role requirements.
+  4. `gap_analysis`: Identifies missing portfolio evidence (e.g., missing live demos, unquantified outcomes) and recommends improvements.
+- Requires explicit user approval before any AI suggestion is saved to the database.
+
+### 24.5 REST API Endpoints
+All endpoints mounted under `/api/v1/portfolios` with tenant isolation and public access routes:
+- `GET /api/v1/portfolios/me`: Retrieves current user's portfolio with all sections, projects, and version count.
+- `PUT /api/v1/portfolios/profile`: Updates headline, title, and structured profile data.
+- `PUT /api/v1/portfolios/theme`: Updates template ID, theme configuration, and custom CSS.
+- `PUT /api/v1/portfolios/slug`: Sets custom unique public URL slug.
+- `POST /api/v1/portfolios/publish`: Publishes portfolio to public web.
+- `POST /api/v1/portfolios/unpublish`: Revokes public access immediately.
+- `PUT /api/v1/portfolios/sections/reorder`: Reorders sections and toggles visibility.
+- `PATCH /api/v1/portfolios/sections/{id}`: Updates individual section metadata.
+- `POST /api/v1/portfolios/projects`: Adds a project to the portfolio.
+- `PATCH /api/v1/portfolios/projects/{id}`: Updates project details.
+- `DELETE /api/v1/portfolios/projects/{id}`: Deletes a project.
+- `POST /api/v1/portfolios/projects/import-learning/{id}`: Imports completed learning roadmap project.
+- `POST /api/v1/portfolios/import-resume`: Imports profile and skills from latest parsed resume.
+- `POST /api/v1/portfolios/versions`: Creates version snapshot.
+- `GET /api/v1/portfolios/versions`: Lists historical snapshots.
+- `POST /api/v1/portfolios/versions/{id}/restore`: Restores portfolio to a past snapshot.
+- `POST /api/v1/portfolios/ai-assist`: Generates grounded AI suggestions with deterministic fallback.
+- `GET /api/v1/portfolios/export/pdf`: Exports user's portfolio as A4 PDF.
+- `GET /api/v1/portfolios/export/html`: Exports user's portfolio as offline HTML.
+- `GET /api/v1/portfolios/analytics`: Aggregated visitor stats, top-viewed projects, and referrers.
+- `GET /api/v1/portfolios/public/{slug}`: Public unauthenticated endpoint for recruiters.
+- `POST /api/v1/portfolios/public/{slug}/event`: Records public visitor interaction events.
+- `GET /api/v1/portfolios/public/{slug}/export/pdf`: Public recruiter PDF download.
+- `GET /api/v1/portfolios/public/{slug}/export/html`: Public recruiter offline HTML download.
+
+
 

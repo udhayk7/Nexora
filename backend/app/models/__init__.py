@@ -37,6 +37,13 @@ from app.models.learning_roadmap import (
 )
 from app.models.match import JobMatch, UserMatchingPreference
 from app.models.notification import Notification, UserNotificationPreference
+from app.models.portfolio import (
+    Portfolio,
+    PortfolioProject,
+    PortfolioSection,
+    PortfolioVersion,
+    PortfolioViewEvent,
+)
 from app.models.recommendation import AIJobMatch, JobIntelligence
 from app.models.resume import Resume, ResumeVersion
 from app.models.tailoring import ResumeTailoringChange, ResumeTailoringSession
@@ -85,4 +92,9 @@ __all__ = [
     "LearningResource",
     "LearningProject",
     "LearningActivity",
+    "Portfolio",
+    "PortfolioSection",
+    "PortfolioProject",
+    "PortfolioVersion",
+    "PortfolioViewEvent",
 ]

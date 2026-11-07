@@ -99,6 +99,17 @@ Nexora is an AI-powered career discovery and application management platform des
 - 16 REST API endpoints mounted under `/api/v1/learning-roadmaps/*`.
 - Full SaaS UI workspace at `/dashboard/learning-roadmap` with Skill Gaps, Roadmaps, Resources, Projects, and Analytics tabs, plus quick-launch card on the main dashboard.
 
+### 20. Portfolio Studio & Professional Showcase (Prompt 20)
+- Recruiter-ready professional portfolio studio at `/dashboard/portfolio-studio` and standalone public showcase website at `/portfolio/[public_slug]`.
+- Structured career profile containing professional headline, summary, target roles, technical skills, education, work experience, certifications, achievements, and contact links with user approval workflow and zero private account data exposure.
+- Evidence-backed project showcase integrating directly with Learning Roadmap module (`learning_projects`) and Resume Studio (`resumes`), capturing problem statement, tech stack, architecture overview, contribution, repo URL, demo URL, and measurable outcomes.
+- 3 responsive, professionally styled templates (`minimal`, `developer`, `ai_tech`) with customizable theme settings (accent color, typography, dark/light modes).
+- Interactive visual portfolio editor with drag/order controls, section visibility toggling, project selection, live responsive preview, and version snapshot history with rollback.
+- Grounded AI portfolio assistant (`AIPortfolioAssistantEngine`) supporting 4 assistance modes (`improve_summary`, `project_description`, `role_tailoring`, `gap_analysis`) with strict anti-hallucination boundaries, deterministic fallback, and required user confirmation.
+- Multi-channel publishing and export: public unguessable slug with instant revocation, self-contained offline static HTML export, and high-quality ReportLab A4 PDF export.
+- Privacy-conscious visitor analytics tracking page views, project clicks, downloads, referrers, and device categories without collecting visitor PII.
+- Comprehensive database schema (`Portfolio`, `PortfolioSection`, `PortfolioProject`, `PortfolioVersion`, `PortfolioViewEvent`) and 20+ REST API endpoints under `/api/v1/portfolios/*`.
+
 ---
 
 ## Non-Functional Requirements
