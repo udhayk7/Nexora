@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.application import JobApplication
     from app.models.company import Company
     from app.models.match import JobMatch
+    from app.models.recommendation import AIJobMatch, JobIntelligence
     from app.models.tailoring import ResumeTailoringSession
     from app.models.user import User
 
@@ -219,6 +220,17 @@ class Job(Base, TimestampMixin):
     applications: Mapped[list["JobApplication"]] = relationship(
         "JobApplication",
         back_populates="job",
+    )
+    intelligence: Mapped[Optional["JobIntelligence"]] = relationship(
+        "JobIntelligence",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    ai_matches: Mapped[list["AIJobMatch"]] = relationship(
+        "AIJobMatch",
+        back_populates="job",
+        cascade="all, delete-orphan",
     )
 
 

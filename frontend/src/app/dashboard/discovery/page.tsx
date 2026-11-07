@@ -1344,3 +1344,4 @@ export default function DiscoveryPage() {
     </div>
   );
 }
+

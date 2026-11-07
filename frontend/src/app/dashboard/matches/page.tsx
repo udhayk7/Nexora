@@ -408,6 +408,13 @@ export default function MatchesPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <Link
+            href="/dashboard/recommendations"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-border bg-card hover:bg-secondary text-foreground transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-violet-500" /> AI Recommendations
+          </Link>
+
           <button
             onClick={() => loadMatches()}
             className="p-2 rounded-lg border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"

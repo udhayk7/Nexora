@@ -1,9 +1,11 @@
 import ipaddress
 import re
 import socket
-from typing import Optional
+from collections.abc import Iterable
+from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
+import httpcore
 import httpx
 
 from app.core.errors import BadRequestError
@@ -135,6 +137,62 @@ def validate_safe_url(url: Optional[str], field_name: str = "URL") -> Optional[s
     return cleaned
 
 
+class SSRFProtectedSyncBackend(httpcore.SyncBackend):
+    """Enforces connection-time IP validation to eliminate DNS rebinding risks."""
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: Optional[float] = None,
+        local_address: Optional[str] = None,
+        socket_options: Optional[Iterable[Any]] = None,
+    ) -> httpcore.NetworkStream:
+        try:
+            addr_info = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+        except socket.gaierror as exc:
+            raise httpcore.ConnectError(f"DNS resolution failed for {host}: {exc}") from exc
+
+        verified_ip: Optional[str] = None
+        for entry in addr_info:
+            sockaddr = entry[4]
+            ip_str = str(sockaddr[0])
+            if is_ip_private_or_restricted(ip_str):
+                raise httpcore.ConnectError(
+                    f"Blocked restricted IP {ip_str} (connection-time DNS rebinding protection)"
+                )
+            if not verified_ip:
+                verified_ip = ip_str
+
+        if not verified_ip:
+            raise httpcore.ConnectError(f"No valid public IP addresses resolved for {host}")
+
+        return super().connect_tcp(
+            verified_ip,
+            port,
+            timeout=timeout,
+            local_address=local_address,
+            socket_options=socket_options,
+        )
+
+
+class SSRFSafeTransport(httpx.HTTPTransport):
+    """Custom httpx transport enforcing connection-time destination validation and IP pinning."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._pool = httpcore.ConnectionPool(
+            network_backend=SSRFProtectedSyncBackend(),
+            ssl_context=getattr(self._pool, "_ssl_context", None),
+            max_connections=getattr(self._pool, "_max_connections", 10),
+            max_keepalive_connections=getattr(self._pool, "_max_keepalive_connections", None),
+            keepalive_expiry=getattr(self._pool, "_keepalive_expiry", None),
+            http1=getattr(self._pool, "_http1", True),
+            http2=getattr(self._pool, "_http2", False),
+            retries=getattr(self._pool, "_retries", 0),
+        )
+
+
 def safe_check_url_status(
     url: str,
     timeout: float = 8.0,
@@ -143,7 +201,7 @@ def safe_check_url_status(
     """Safely check an external URL's availability with strict SSRF and connection guards.
 
     Validates URL host, prohibits local/private/cloud-metadata networks at each redirect hop,
-    and queries HTTP status codes safely.
+    and queries HTTP status codes safely using SSRFSafeTransport with connection-time IP pinning.
 
     Returns:
         (is_reachable, status_code, message)
@@ -168,6 +226,7 @@ def safe_check_url_status(
                 return False, None, "Redirect URL is empty"
 
             with httpx.Client(
+                transport=SSRFSafeTransport(),
                 timeout=timeout,
                 follow_redirects=False,
                 verify=True,

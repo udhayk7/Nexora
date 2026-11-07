@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from app.core.url_validator import validate_safe_url
+from app.core.url_validator import SSRFSafeTransport, validate_safe_url
 
 DEFAULT_USER_AGENT = "Nexora-JobDiscoveryBot/1.0 (+https://nexora.app; contact@nexora.app)"
 
@@ -78,6 +78,7 @@ class BaseSourceAdapter(ABC):
                 raise ValueError("Redirect URL failed safety validation")
 
             with httpx.Client(
+                transport=SSRFSafeTransport(),
                 timeout=self.timeout,
                 follow_redirects=False,
                 verify=True,

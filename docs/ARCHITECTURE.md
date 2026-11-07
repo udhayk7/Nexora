@@ -375,6 +375,111 @@ All API errors return a uniform, predictable JSON shape:
 
 ---
 
+## 18. AI Job Intelligence & Personalized Recommendations Architecture
+
+Nexora's AI Job Intelligence and Personalized Recommendations system pairs the deterministic, explainable job-matching engine with structured AI description intelligence, deep candidate-to-job compatibility assessments, and balanced recommendation scoring.
+
+### 18.1 Core Components
+
+```
++----------------------------------------------------------------------------------------------------+
+|                                    DISCOVERED JOBS & CAREER SOURCES                                |
++----------------------------------------------------------------------------------------------------+
+                                                   |
+                                                   v
+                         +--------------------------------------------------+
+                         |       JobDescriptionIntelligenceEngine           |
+                         |  Extracts: skills, experience, education, tools, |
+                         |  responsibilities, seniority, evidence excerpts  |
+                         |  * SHA-256 content_hash caching                  |
+                         +--------------------------------------------------+
+                                                   |
+                                                   v
+                                        [job_intelligences]
+                                                   |
+    +----------------------------------------------+----------------------------------------------+
+    |                                                                                             |
+    v                                                                                             v
++------------------------------------+                                          +------------------------------------+
+|  Deterministic Matching Engine     |                                          |       AIJobMatchEngine             |
+|  - Skill alignment (35%)           |                                          |  - Technical compatibility         |
+|  - Role family (25%)               |                                          |  - Project & internship alignment  |
+|  - Seniority & experience (15%)    |                                          |  - Transferable skills discovery   |
+|  - Location & arrangement (15%)    |                                          |  - Actionable gap signals          |
+|  - Disclosed compensation (10%)    |                                          |  * SHA-256 assessment_hash caching |
+|  * Undisclosed salary neutrality   |                                          +------------------------------------+
++------------------------------------+                                                            |
+                  \                                                                              /
+                   \                                                                            /
+                    \                                                                          /
+                     +------------------------------------------------------------------------+
+                     |                 Personalized Recommendation Engine                     |
+                     |  - Blended scoring: S_rec = 0.60*S_det + 0.40*S_ai (or 1.0*S_det)      |
+                     |  - Priority bonuses: Python, AI/ML, GenAI, Frontend, Fullstack, SDE    |
+                     |  - Automatic exclusion of dismissed and applied opportunities          |
+                     |  - Grounded explanations: Why Matches, Potential Gaps, Next Steps     |
+                     +------------------------------------------------------------------------+
+                                                   |
+                                                   v
+                     +------------------------------------------------------------------------+
+                     |           Recommendations Workspace (/dashboard/recommendations)       |
+                     |  - KPI metrics, multi-dimensional filters, AI Insights modal           |
+                     |  - Direct save/dismiss, application pipeline shortcut, refresh controls|
+                     +------------------------------------------------------------------------+
+```
+
+### 18.2 Structured Job Description Intelligence (`JobIntelligence`)
+- **Extraction Schema**: Structured extraction capturing:
+  - `required_skills`: Mandated technical and domain competencies.
+  - `preferred_skills`: Desirable competencies and nice-to-haves.
+  - `min_experience_years` & `max_experience_years`: Explicit experience ranges.
+  - `education_qualifications`: Extracted degree levels (B.Tech/BS, MS, etc.).
+  - `responsibilities`: Core day-to-day job duties.
+  - `tools_and_frameworks`: Libraries, developer tools, and infrastructure.
+  - `seniority_level`: Inferred seniority (`fresher`, `junior`, `mid`, `senior`).
+  - `work_arrangement`: Extracted arrangement (`remote`, `hybrid`, `on_site`).
+  - `salary_min`, `salary_max`, `salary_currency`: Explicit salary only; never fabricated.
+  - `evidence_excerpts`: Verbatim citations from the listing supporting extracted fields.
+- **Cost Optimization & Caching**:
+  - Content SHA-256 hash (`content_hash = SHA-256(title + description + location + arrangement)`).
+  - Unmodified job listings reuse stored `job_intelligences` records with 0 AI API overhead.
+  - Deterministic fallback (`DeterministicJobAnalyzer`) executes instantly when AI provider is unconfigured or unavailable.
+
+### 18.3 Resume-to-Job AI Compatibility Matching (`AIJobMatch`)
+- **Evaluation Criteria**:
+  - `compatibility_rating`: `strong`, `moderate`, `potential`, `unlikely`.
+  - `fit_score`: Calibrated percentage score (0-100).
+  - `strengths`: Concrete matches with verbatim resume and job evidence citations.
+  - `skill_gaps`: Missing prerequisites with distinction between trainable vs hard blockers.
+  - `experience_alignment`: Evaluation of academic, internship, and project experience.
+  - `transferable_skills`: Recognition of adjacent technologies (e.g. Flask/Django $\rightarrow$ FastAPI, React $\rightarrow$ Next.js, C++ $\rightarrow$ Go/Rust, PyTorch $\rightarrow$ TensorFlow).
+  - `missing_requirements`: Explicitly missing qualifications without penalizing undisclosed candidate data.
+  - `recommendation_rationale`: Grounded prose explaining why the opportunity is suitable.
+  - `next_steps`: Concrete preparation steps (tailoring resume, highlighting specific projects).
+- **Cost Optimization & Assessment Hashing**:
+  - Assessment SHA-256 hash (`assessment_hash = SHA-256(user_id + resume_version_id + job_id + job_content_hash)`).
+  - Enforces database unique constraint `uq_user_resume_version_job_ai`.
+  - Deterministic fallback (`DeterministicAIMatchEvaluator`) provides rich heuristics and transferable skill detection without external LLM calls.
+
+### 18.4 Blended Recommendation Ranking Engine
+- **Formula**:
+  $$S_{rec} = \begin{cases} 0.60 \times S_{det} + 0.40 \times S_{ai} & \text{if AI evaluated} \\ S_{det} & \text{otherwise} \end{cases}$$
+- **Early-Career & Role Priority Bonuses**:
+  - Early-career bonus (+3.0 pts) for `fresher` or `junior` roles.
+  - Priority role bonus (+4.0 pts) for listings matching Python, AI/ML, GenAI, Frontend, Full-stack, SDE, and Data Engineering tracks.
+- **Undisclosed Salary Standard**:
+  - Undisclosed salary is treated as completely neutral ($0.0$ penalty). Listings without disclosed compensation display a reassuring "Salary Undisclosed (Neutral)" indicator.
+- **Exclusion Filters**:
+  - Jobs previously marked dismissed (`is_dismissed = True`) are automatically excluded.
+  - Jobs with active applications (`applied`, `interview`, etc.) are excluded unless `include_applied = True` is selected.
+
+### 18.5 Connection-Time SSRF & DNS Rebinding Protection (`SSRFSafeTransport`)
+- Outbound HTTP requests in `BaseSourceAdapter` and URL validation utilize `SSRFSafeTransport` (`app/core/url_validator.py`).
+- Intercepts socket TCP connections directly at connection time (`connect_tcp`), resolves the IP, and blocks loopback (`127.0.0.0/8`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local (`169.254.0.0/16`), and AWS/GCP cloud metadata endpoints (`169.254.169.254`).
+- Connection is pinned directly to the validated IP to defeat time-of-check to time-of-use (TOCTOU) DNS rebinding attacks.
+
+---
+
 ## Token & Cookie Security Strategy
 
 | Aspect | Strategy & Implementation | Tradeoff / Mitigation |

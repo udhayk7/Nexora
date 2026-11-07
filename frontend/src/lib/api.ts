@@ -1609,4 +1609,251 @@ export const discoveryApi = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Recommendations & AI Job Intelligence Types
+// ---------------------------------------------------------------------------
+
+export interface JobIntelligence {
+  id: string;
+  job_id: string;
+  content_hash: string;
+  provider: string;
+  model: string;
+  status: string;
+  error_message?: string | null;
+  required_skills: string[];
+  preferred_skills: string[];
+  experience_requirements: {
+    min_years?: number;
+    max_years?: number | null;
+    description?: string;
+  };
+  educational_qualifications: string[];
+  responsibilities: string[];
+  tools_and_frameworks: string[];
+  seniority_level: string;
+  work_arrangement: string;
+  compensation_info?: {
+    min?: number;
+    max?: number;
+    currency?: string;
+    period?: string;
+    disclosed?: boolean;
+  } | null;
+  application_requirements: string[];
+  evidence_excerpts: Record<string, string>;
+  is_deterministic_fallback: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIStrengthItem {
+  title: string;
+  description: string;
+  evidence_resume?: string;
+  evidence_job?: string;
+}
+
+export interface AISkillGapItem {
+  skill: string;
+  importance: "high" | "medium" | "low";
+  reason: string;
+  can_learn_on_job: boolean;
+}
+
+export interface AINextStepItem {
+  step: string;
+  action: string;
+  priority: "high" | "medium" | "low";
+}
+
+export interface AIJobMatch {
+  id: string;
+  user_id: string;
+  job_id: string;
+  resume_id: string;
+  resume_version_id: string;
+  job_intelligence_id?: string | null;
+  assessment_hash: string;
+  compatibility_rating: "strong" | "moderate" | "growth_opportunity" | "poor";
+  fit_score?: number | null;
+  fit_summary: string;
+  strengths: AIStrengthItem[];
+  skill_gaps: AISkillGapItem[];
+  experience_alignment: {
+    seniority_fit?: string;
+    candidate_seniority?: string;
+    job_seniority?: string;
+    reasoning?: string;
+  };
+  transferable_skills: string[];
+  missing_requirements: string[];
+  recommendation_rationale: string;
+  next_steps: AINextStepItem[];
+  evidence_citations: Array<{ title: string; evidence_resume?: string }>;
+  provider: string;
+  model: string;
+  status: string;
+  error_message?: string | null;
+  is_deterministic_fallback: boolean;
+  created_at: string;
+}
+
+export interface RecommendationExplanation {
+  why_matches: {
+    skills?: string[];
+    experience?: string;
+    projects?: string[];
+    preference_alignment?: string;
+  };
+  potential_gaps: {
+    missing_skills?: string[];
+    experience_gaps?: string[];
+    qualification_mismatches?: string[];
+  };
+  recommended_next_steps: string[];
+}
+
+export interface JobRecommendationItem {
+  job_id: string;
+  title: string;
+  company_name: string;
+  company_logo_url?: string | null;
+  location_text?: string | null;
+  work_arrangement: string;
+  role_family?: string | null;
+  seniority_level?: string | null;
+  employment_type?: string | null;
+  job_url: string;
+  application_url?: string | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  salary_period?: string | null;
+  salary_disclosed: boolean;
+  verification_status: string;
+  freshness: string;
+  deterministic_score: number;
+  recommendation_score: number;
+  score_breakdown: ScoreBreakdown;
+  is_saved: boolean;
+  is_dismissed: boolean;
+  has_applied: boolean;
+  ai_evaluated: boolean;
+  ai_compatibility_rating?: string | null;
+  ai_fit_score?: number | null;
+  explanation: RecommendationExplanation;
+  first_seen_at: string;
+}
+
+export interface RecommendationListResponse {
+  items: JobRecommendationItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  active_resume_version_id?: string | null;
+  active_resume_title?: string | null;
+  stats: {
+    top_score: number;
+    total_count: number;
+    ai_evaluated_count: number;
+    verified_count: number;
+  };
+}
+
+export interface RecommendationRefreshRequest {
+  resume_version_id?: string;
+  evaluate_top_ai?: boolean;
+  max_ai_evaluations?: number;
+}
+
+export interface RecommendationRefreshResponse {
+  message: string;
+  recommendations_count: number;
+  ai_evaluations_run: number;
+}
+
+export const recommendationsApi = {
+  getRecommendations: (params?: {
+    resume_version_id?: string;
+    role_family?: string;
+    location?: string;
+    work_arrangement?: string;
+    seniority?: string;
+    verification_status?: string;
+    min_score?: number;
+    salary_disclosed_only?: boolean;
+    include_applied?: boolean;
+    search_query?: string;
+    sort_by?: string;
+    page?: number;
+    page_size?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.resume_version_id) q.append("resume_version_id", params.resume_version_id);
+    if (params?.role_family) q.append("role_family", params.role_family);
+    if (params?.location) q.append("location", params.location);
+    if (params?.work_arrangement) q.append("work_arrangement", params.work_arrangement);
+    if (params?.seniority) q.append("seniority", params.seniority);
+    if (params?.verification_status) q.append("verification_status", params.verification_status);
+    if (params?.min_score !== undefined) q.append("min_score", String(params.min_score));
+    if (params?.salary_disclosed_only) q.append("salary_disclosed_only", "true");
+    if (params?.include_applied) q.append("include_applied", "true");
+    if (params?.search_query) q.append("search_query", params.search_query);
+    if (params?.sort_by) q.append("sort_by", params.sort_by);
+    if (params?.page) q.append("page", String(params.page));
+    if (params?.page_size) q.append("page_size", String(params.page_size));
+    const qs = q.toString();
+    return apiClient<RecommendationListResponse>(`/recommendations${qs ? `?${qs}` : ""}`);
+  },
+
+  refreshRecommendations: (data: RecommendationRefreshRequest) =>
+    apiClient<RecommendationRefreshResponse>("/recommendations/refresh", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  runAIMatch: (jobId: string, params?: { resume_version_id?: string; force_refresh?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.resume_version_id) q.append("resume_version_id", params.resume_version_id);
+    if (params?.force_refresh) q.append("force_refresh", "true");
+    const qs = q.toString();
+    return apiClient<AIJobMatch>(`/recommendations/jobs/${jobId}/ai-match${qs ? `?${qs}` : ""}`, {
+      method: "POST",
+    });
+  },
+
+  getAIMatch: (jobId: string, resumeVersionId?: string) => {
+    const qs = resumeVersionId ? `?resume_version_id=${resumeVersionId}` : "";
+    return apiClient<AIJobMatch>(`/recommendations/jobs/${jobId}/ai-match${qs}`);
+  },
+
+  getJobIntelligence: (jobId: string) =>
+    apiClient<JobIntelligence>(`/recommendations/jobs/${jobId}/intelligence`),
+
+  analyzeJobIntelligence: (jobId: string, force_refresh: boolean = false) =>
+    apiClient<JobIntelligence>(
+      `/recommendations/jobs/${jobId}/intelligence?force_refresh=${force_refresh}`,
+      {
+        method: "POST",
+      }
+    ),
+
+  updateJobState: (
+    jobId: string,
+    state: { is_saved?: boolean; is_dismissed?: boolean }
+  ) =>
+    apiClient<{ job_id: string; is_saved: boolean; is_dismissed: boolean }>(
+      `/recommendations/jobs/${jobId}/state`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(state),
+      }
+    ),
+};
+
+export const matchesApi = matchingApi;
+
+
 

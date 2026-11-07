@@ -7,6 +7,7 @@ from app.api.v1.discovery import router as discovery_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.matches import matches_router
 from app.api.v1.notifications import router as notifications_router
+from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.resumes import resumes_router
 from app.api.v1.tailoring import tailoring_router
 from app.api.v1.users import users_router
@@ -37,3 +38,4 @@ api_router.include_router(tailoring_router)
 api_router.include_router(applications_router)
 api_router.include_router(notifications_router)
 api_router.include_router(discovery_router, prefix="/discovery", tags=["Job Discovery"])
+api_router.include_router(recommendations_router)

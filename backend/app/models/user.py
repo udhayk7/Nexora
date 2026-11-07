@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.job import Job
     from app.models.match import JobMatch, UserMatchingPreference
     from app.models.notification import Notification, UserNotificationPreference
+    from app.models.recommendation import AIJobMatch
     from app.models.resume import Resume
     from app.models.tailoring import ResumeTailoringSession
     from app.models.token import RefreshToken
@@ -113,5 +114,10 @@ class User(Base, TimestampMixin):
         "UserNotificationPreference",
         back_populates="user",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    ai_job_matches: Mapped[list["AIJobMatch"]] = relationship(
+        "AIJobMatch",
+        back_populates="user",
         cascade="all, delete-orphan",
     )

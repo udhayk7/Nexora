@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.core.database import get_db
+from app.core.errors import NotFoundError
+from app.models.job import Job
 from app.models.user import User
 from app.schemas.job import (
     FeedIngestRequest,
@@ -27,6 +29,7 @@ from app.schemas.job import (
     JobVerifyRequest,
     WorkArrangementType,
 )
+from app.schemas.recommendation import JobIntelligenceResponse
 from app.services.job_service import JobService
 
 jobs_router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -252,3 +255,40 @@ def ingest_feed(
 ) -> FeedIngestResult:
     """Batch-ingest job opportunities from a permitted feed with idempotency and error tracking."""
     return JobService.ingest_feed(db=db, user=current_user, data=data)
+
+
+@jobs_router.get(
+    "/{job_id}/intelligence",
+    response_model=JobIntelligenceResponse,
+    summary="Retrieve structured job description intelligence",
+)
+def get_job_intelligence(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JobIntelligenceResponse:
+    """Retrieve structured requirements, skills, and evidence extracted from the job description."""
+    from app.services.job_intelligence_service import JobIntelligenceService
+
+    return JobIntelligenceService.get_by_job_id(db=db, job_id=job_id)
+
+
+@jobs_router.post(
+    "/{job_id}/intelligence",
+    response_model=JobIntelligenceResponse,
+    summary="Analyze or refresh job description intelligence",
+)
+def analyze_job_intelligence(
+    job_id: uuid.UUID,
+    force_refresh: bool = Query(False, description="Force re-extraction bypassing cache"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> JobIntelligenceResponse:
+    """Extract or re-extract structured requirements and skills from the job description."""
+    from app.services.job_intelligence_service import JobIntelligenceService
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise NotFoundError("Job opportunity not found")
+    intelligence = JobIntelligenceService.get_or_create(db=db, job=job, force_refresh=force_refresh)
+    return JobIntelligenceResponse.model_validate(intelligence)

@@ -26,6 +26,17 @@ from app.schemas.notification import (
     UserNotificationPreferenceResponse,
     UserNotificationPreferenceUpdate,
 )
+from app.schemas.recommendation import (
+    AIJobMatchResponse,
+    JobIntelligenceResponse,
+    JobRecommendationItem,
+    RecommendationExplanation,
+    RecommendationListResponse,
+    RecommendationRefreshRequest,
+    RecommendationRefreshResponse,
+    RecommendationStateResponse,
+    RecommendationStateUpdateRequest,
+)
 from app.schemas.tailoring import (
     BatchChangeActionRequest,
     ChangeStatusUpdateRequest,
@@ -78,4 +89,13 @@ __all__ = [
     "UserNotificationPreferenceResponse",
     "UserNotificationPreferenceUpdate",
     "ProcessRemindersResponse",
+    "JobIntelligenceResponse",
+    "AIJobMatchResponse",
+    "RecommendationExplanation",
+    "JobRecommendationItem",
+    "RecommendationListResponse",
+    "RecommendationRefreshRequest",
+    "RecommendationRefreshResponse",
+    "RecommendationStateUpdateRequest",
+    "RecommendationStateResponse",
 ]
