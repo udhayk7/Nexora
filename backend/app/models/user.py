@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.models.job import Job
     from app.models.learning_roadmap import LearningProject, LearningRoadmap
     from app.models.match import JobMatch, UserMatchingPreference
+    from app.models.networking import NetworkingContact
     from app.models.notification import Notification, UserNotificationPreference
     from app.models.portfolio import Portfolio
     from app.models.recommendation import AIJobMatch
@@ -174,6 +175,11 @@ class User(Base, TimestampMixin):
     )
     workflow_runs: Mapped[list["CareerWorkflowRun"]] = relationship(
         "CareerWorkflowRun",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    networking_contacts: Mapped[list["NetworkingContact"]] = relationship(
+        "NetworkingContact",
         back_populates="user",
         cascade="all, delete-orphan",
     )

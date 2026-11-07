@@ -19,6 +19,7 @@ celery.conf.update(
         "app.tasks.reminder_tasks",
         "app.tasks.discovery_tasks",
         "app.tasks.workflow_tasks",
+        "app.tasks.networking_tasks",
     ],
     beat_schedule={
         "process-scheduled-reminders-every-15-mins": {

@@ -3,7 +3,7 @@
 import React, { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, Globe, GraduationCap, Layers, Layout, LogOut, SendHorizontal, ShieldCheck, Sparkles, User } from "lucide-react";
+import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, Globe, GraduationCap, Layers, Layout, LogOut, SendHorizontal, ShieldCheck, Sparkles, User, Users } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { NotificationBell } from "@/components/NotificationBell";
 
@@ -433,6 +433,26 @@ export default function DashboardPage() {
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
               Scheduled interview alarms, deadline alerts, follow-up notifications, and timezone preferences.
+            </p>
+          </Link>
+
+          <Link
+            href="/dashboard/networking"
+            className="group p-6 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-secondary/40 transition-all shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <Users className="w-6 h-6" />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-primary group-hover:translate-x-0.5 transition-transform">
+                Open CRM <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+              Professional Networking & Recruiters
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Recruiter intelligence, explainable match ranking, grounded outreach generator (LinkedIn ≤300 chars & Gmail), and relationship CRM.
             </p>
           </Link>
         </div>

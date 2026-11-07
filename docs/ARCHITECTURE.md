@@ -956,6 +956,78 @@ Integrates 8 unified assets into one cohesive candidate cockpit:
 - `GET /api/v1/career-workflow/runs`: Lists user's past and active workflow orchestration runs.
 - `POST /api/v1/career-workflow/runs/{id}/cancel`: Cancels an active or pending workflow run.
 
+## 26. Professional Networking & Recruiter Intelligence Architecture
+
+### 26.1 System Invariants & Anti-Scraping Policies
+The Professional Networking and Recruiter Intelligence system discovers hiring team contacts, matches candidates to recruiters, assists with grounded outreach drafting, and manages relationship states within a structured CRM.
+
+Core architectural invariants:
+1. **Zero Fabrication & Anti-Guessing**: Recruiter profiles are grounded in permitted public data or candidate additions. Nexora strictly forbids guessing recruiter email addresses (no synthetic permutation generation or pattern inference without verification).
+2. **Permitted Public Sources Only**: Recruiter intelligence ingests only permitted public sources (official company careers pages, leadership/team directories, public company announcements, and candidate manual entries). Unpermitted LinkedIn scraping, session hijacking, and CAPTCHA bypass are strictly prohibited.
+3. **LinkedIn Length Enforcement**: LinkedIn connection requests are strictly validated and constrained to $\le 300$ characters.
+4. **Candidate Approval Gate**: All outreach messages are stored in draft status and require explicit candidate review and approval before copying or sending.
+5. **Decoupled Gmail Dispatch**: Email dispatch via Gmail OAuth strictly requires immediate explicit confirmation (`confirm_send=True`), verified recipient address, and audit logging.
+
+### 26.2 Relational Database Schema (`app/models/networking.py`)
+- **`RecruiterProfile` (`recruiter_profiles`)**:
+  - `id`: UUID primary key.
+  - `full_name`: Candidate or source provided recruiter name.
+  - `normalized_name`: Lowercase stripped name for deduplication.
+  - `designation`: Professional title (e.g., "Senior Technical Recruiter").
+  - `company_id`: Foreign key referencing `companies.id` (`ondelete=CASCADE`).
+  - `company_name`: Normalized company name string.
+  - `recruitment_specialization`: Area of focus (`Technical Recruitment`, `Campus & University`, `Executive`, etc.).
+  - `relevant_departments`: JSON list of department names.
+  - `public_profile_url`: Public profile link (LinkedIn or careers directory).
+  - `contact_email`: Publicly available professional contact email (or `None`).
+  - `phone`: Public phone contact (or `None`).
+  - `associated_job_ids`: JSON list of related job UUIDs.
+  - `source_type`: `official_careers_page`, `team_page`, `public_announcement`, `manual_user_addition`, `job_listing`.
+  - `verification_status`: `verified`, `inferred`, `unverified`.
+  - `is_global`: Boolean indicating shared platform profile vs private profile.
+  - `created_by_user_id`: Foreign key referencing creator if manually added.
+- **`NetworkingContact` (`networking_contacts`)**:
+  - Unique constraint on `(user_id, recruiter_id)`.
+  - Relationship lifecycle: `saved`, `outreach_prepared`, `contacted`, `awaiting_response`, `responded`, `follow_up_required`, `connected`, `archived`.
+  - Channel: `linkedin`, `email`, `career_fair`, `referral`, `other`.
+  - Response status: `pending`, `positive`, `neutral`, `declined`, `no_response`.
+  - Timestamps: `initial_contact_date`, `last_contact_date`, `next_follow_up_date`, `response_received_at`.
+  - Candidate notes: `networking_notes` and `tags` JSON.
+- **`NetworkingOutreachMessage` (`networking_outreach_messages`)**:
+  - Grounded communication draft.
+  - Message types: `linkedin_connection`, `recruiter_intro`, `job_inquiry`, `internship_inquiry`, `follow_up`, `interview_thank_you`, `networking_email`.
+  - Status: `draft`, `approved`, `sent`, `discarded`.
+  - Approval timestamps: `approval_confirmed_at`, `sent_at`, `sent_via_gmail`, `gmail_message_id`.
+  - Factual grounding: `grounded_claims` JSON array with verifiable candidate assertions.
+- **`NetworkingActivity` (`networking_activities`)**:
+  - Chronological interaction and audit record per user and contact.
+  - Activity types: `status_change`, `outreach_created`, `outreach_approved`, `message_sent`, `response_recorded`, `follow_up_scheduled`.
+
+### 26.3 Recruiter Matching Engine (`app/services/recruiter_matching_engine.py`)
+Computes multi-dimensional explainable score (0-100):
+$$S_{\text{recruiter}} = 0.35 \times S_{\text{role}} + 0.30 \times S_{\text{company}} + 0.20 \times S_{\text{skills}} + 0.15 \times S_{\text{dept}}$$
+- **Role Alignment ($S_{\text{role}}$)**: Matches candidate target role families against recruiter specialization and hiring focus.
+- **Company Fit ($S_{\text{company}}$)**: Higher score for preferred companies, companies with active candidate applications, or verified employer tiers.
+- **Skills Relevance ($S_{\text{skills}}$)**: Evaluates overlap between verified resume skills and department technical competencies.
+- **Department Score ($S_{\text{dept}}$)**: Department alignment (e.g., Engineering, Data, Product).
+
+### 26.4 REST API Endpoints (`/api/v1/networking/*`)
+- `GET /api/v1/networking/recruiters`: Search and discover recruiters with explainable match scoring.
+- `POST /api/v1/networking/recruiters`: Manually record recruiter intelligence with deduplication.
+- `GET /api/v1/networking/recruiters/{id}`: Detailed recruiter profile and company context.
+- `PATCH /api/v1/networking/recruiters/{id}`: Update recruiter intelligence and verification details.
+- `POST /api/v1/networking/recruiters/discover-company/{company_id}`: Auto-seed hiring team from company careers context.
+- `GET /api/v1/networking/crm/overview`: Aggregated relationship KPIs, tracked companies, and response stats.
+- `GET /api/v1/networking/crm/contacts`: Filter and list user's saved networking relationships.
+- `POST /api/v1/networking/crm/contacts`: Add or update recruiter relationship in CRM.
+- `PATCH /api/v1/networking/crm/contacts/{id}`: Update relationship status, follow-up dates, or notes.
+- `DELETE /api/v1/networking/crm/contacts/{id}`: Remove contact from personal CRM.
+- `POST /api/v1/networking/outreach/generate`: Generate personalized outreach draft across 7 message types.
+- `POST /api/v1/networking/outreach/messages/{id}/approve`: Explicit candidate review and approval gate.
+- `POST /api/v1/networking/outreach/messages/{id}/send-gmail`: Dispatch approved email via Gmail with `confirm_send=True`.
+- `GET /api/v1/networking/follow-ups/due`: Returns contacts overdue for follow-up (>5 days or passed date).
+
+
 
 
 

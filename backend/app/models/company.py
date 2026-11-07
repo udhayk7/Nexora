@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         CompanyResearchSource,
     )
     from app.models.job import Job
+    from app.models.networking import RecruiterProfile
     from app.models.user import User
 
 
@@ -182,6 +183,11 @@ class Company(Base, TimestampMixin):
         back_populates="company",
         cascade="all, delete-orphan",
         order_by="desc(CompanyResearchReport.created_at)",
+    )
+    recruiters: Mapped[list["RecruiterProfile"]] = relationship(
+        "RecruiterProfile",
+        back_populates="company",
+        cascade="all, delete-orphan",
     )
 
 

@@ -3763,6 +3763,304 @@ export const careerWorkflowApi = {
     }),
 };
 
+// ============================================================================
+// Professional Networking & Recruiter Intelligence (Prompt 22)
+// ============================================================================
+
+export interface RecruiterProfileItem {
+  id: string;
+  full_name: string;
+  designation?: string | null;
+  company_id?: string | null;
+  company_name: string;
+  recruitment_specialization: string;
+  relevant_departments: string[];
+  public_profile_url?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  associated_job_ids: string[];
+  source_type: string;
+  verification_status: "verified" | "unverified" | "inferred";
+  is_verified: boolean;
+  is_global: boolean;
+  created_at: string;
+  match_score?: number;
+  match_reasons?: string[];
+  why_recommended?: string | null;
+  inferred_from?: string | null;
+}
+
+export interface RecruiterMatchExplanation {
+  role_alignment_score: number;
+  company_fit_score: number;
+  skills_relevance_score: number;
+  department_score: number;
+  overall_score: number;
+  match_reasons: string[];
+  summary: string;
+}
+
+export interface RecruiterMatchItem {
+  recruiter: RecruiterProfileItem;
+  match_score: number;
+  explanation: RecruiterMatchExplanation;
+}
+
+export interface RecruiterDiscoveryResponse {
+  recruiters: RecruiterProfileItem[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface NetworkingActivityItem {
+  id: string;
+  relationship_id?: string | null;
+  recruiter_id?: string | null;
+  activity_type: string;
+  title: string;
+  description?: string | null;
+  created_at: string;
+}
+
+export interface NetworkingContactItem {
+  id: string;
+  user_id: string;
+  recruiter_id: string;
+  company_id?: string | null;
+  job_id?: string | null;
+  application_id?: string | null;
+  relationship_status: string;
+  communication_channel: string;
+  response_status: string;
+  initial_contact_date?: string | null;
+  last_contact_date?: string | null;
+  next_follow_up_date?: string | null;
+  networking_notes?: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  recruiter?: RecruiterProfileItem;
+  recent_activities: NetworkingActivityItem[];
+}
+
+export interface NetworkingCRMOverview {
+  saved_recruiters_count: number;
+  companies_tracked_count: number;
+  outreach_messages_count: number;
+  pending_responses_count: number;
+  follow_ups_due_count: number;
+  status_distribution: Record<string, number>;
+  recent_activities: NetworkingActivityItem[];
+}
+
+export interface OutreachMessageItem {
+  id: string;
+  user_id: string;
+  recruiter_id: string;
+  relationship_id?: string | null;
+  job_id?: string | null;
+  resume_version_id?: string | null;
+  message_type: string;
+  channel: string;
+  tone: string;
+  subject?: string | null;
+  body: string;
+  character_count: number;
+  grounded_claims: string[];
+  status: string;
+  approval_confirmed_at?: string | null;
+  sent_at?: string | null;
+  sent_via_gmail: boolean;
+  gmail_message_id?: string | null;
+  created_at: string;
+}
+
+export interface FollowUpDueItem {
+  relationship_id: string;
+  recruiter_id: string;
+  recruiter_name: string;
+  company_name: string;
+  relationship_status: string;
+  last_contact_date?: string | null;
+  next_follow_up_date?: string | null;
+  days_since_last_contact: number;
+  suggested_message_type: string;
+  recommended_action: string;
+}
+
+export interface FollowUpDueResponse {
+  total_due: number;
+  items: FollowUpDueItem[];
+}
+
+export const networkingApi = {
+  discoverRecruiters: (params?: {
+    search?: string;
+    company_id?: string;
+    specialization?: string;
+    verification_status?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.search) q.append("search", params.search);
+    if (params?.company_id) q.append("company_id", params.company_id);
+    if (params?.specialization) q.append("specialization", params.specialization);
+    if (params?.verification_status) q.append("verification_status", params.verification_status);
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<RecruiterDiscoveryResponse>(`/networking/recruiters${qs ? `?${qs}` : ""}`);
+  },
+
+  createRecruiter: (payload: {
+    full_name: string;
+    designation?: string;
+    company_name: string;
+    company_id?: string;
+    recruitment_specialization?: string;
+    relevant_departments?: string[];
+    public_profile_url?: string;
+    contact_email?: string;
+    contact_phone?: string;
+    verification_status?: string;
+  }) =>
+    apiClient<RecruiterProfileItem>("/networking/recruiters", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getRecruiter: (id: string) => apiClient<RecruiterProfileItem>(`/networking/recruiters/${id}`),
+
+  updateRecruiter: (
+    id: string,
+    payload: {
+      designation?: string;
+      recruitment_specialization?: string;
+      relevant_departments?: string[];
+      public_profile_url?: string;
+      contact_email?: string;
+      contact_phone?: string;
+      verification_status?: string;
+    }
+  ) =>
+    apiClient<RecruiterProfileItem>(`/networking/recruiters/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  discoverCompanyRecruiters: (companyId: string) =>
+    apiClient<RecruiterProfileItem[]>(`/networking/recruiters/discover-company/${companyId}`, {
+      method: "POST",
+    }),
+
+  getCRMOverview: () => apiClient<NetworkingCRMOverview>("/networking/crm/overview"),
+
+  listCRMContacts: (params?: {
+    status?: string;
+    channel?: string;
+    response_status?: string;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.append("status", params.status);
+    if (params?.channel) q.append("channel", params.channel);
+    if (params?.response_status) q.append("response_status", params.response_status);
+    if (params?.search) q.append("search", params.search);
+    if (params?.skip !== undefined) q.append("skip", String(params.skip));
+    if (params?.limit !== undefined) q.append("limit", String(params.limit));
+    const qs = q.toString();
+    return apiClient<NetworkingContactItem[]>(`/networking/crm/contacts${qs ? `?${qs}` : ""}`);
+  },
+
+  addCRMContact: (payload: {
+    recruiter_id: string;
+    company_id?: string;
+    job_id?: string;
+    application_id?: string;
+    relationship_status?: string;
+    communication_channel?: string;
+    next_follow_up_date?: string;
+    networking_notes?: string;
+    tags?: string[];
+  }) =>
+    apiClient<NetworkingContactItem>("/networking/crm/contacts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateCRMContact: (
+    id: string,
+    payload: {
+      relationship_status?: string;
+      communication_channel?: string;
+      response_status?: string;
+      next_follow_up_date?: string | null;
+      networking_notes?: string;
+      tags?: string[];
+    }
+  ) =>
+    apiClient<NetworkingContactItem>(`/networking/crm/contacts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteCRMContact: (id: string) =>
+    apiClient<{ status: string; message: string }>(`/networking/crm/contacts/${id}`, {
+      method: "DELETE",
+    }),
+
+  generateOutreach: (payload: {
+    recruiter_id: string;
+    message_type: string;
+    channel?: string;
+    tone?: string;
+    job_id?: string;
+    resume_id?: string;
+    custom_instructions?: string;
+    enforce_linkedin_char_limit?: boolean;
+  }) =>
+    apiClient<OutreachMessageItem>("/networking/outreach/generate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  approveOutreach: (
+    messageId: string,
+    payload: {
+      edited_subject?: string;
+      edited_body: string;
+    }
+  ) =>
+    apiClient<OutreachMessageItem>(`/networking/outreach/messages/${messageId}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  sendGmailOutreach: (
+    messageId: string,
+    payload: {
+      confirm_send: boolean;
+      attach_resume?: boolean;
+    }
+  ) =>
+    apiClient<{
+      status: string;
+      gmail_message_id: string;
+      sent_at: string;
+      message: string;
+    }>(`/networking/outreach/messages/${messageId}/send-gmail`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getDueFollowups: () => apiClient<FollowUpDueResponse>("/networking/follow-ups/due"),
+};
+
+
 
 
 

@@ -36,6 +36,12 @@ from app.models.learning_roadmap import (
     LearningRoadmap,
 )
 from app.models.match import JobMatch, UserMatchingPreference
+from app.models.networking import (
+    NetworkingActivity,
+    NetworkingContact,
+    NetworkingOutreachMessage,
+    RecruiterProfile,
+)
 from app.models.notification import Notification, UserNotificationPreference
 from app.models.portfolio import (
     Portfolio,
@@ -100,4 +106,8 @@ __all__ = [
     "PortfolioViewEvent",
     "CareerWorkflowRun",
     "CareerWorkflowStep",
+    "RecruiterProfile",
+    "NetworkingContact",
+    "NetworkingOutreachMessage",
+    "NetworkingActivity",
 ]

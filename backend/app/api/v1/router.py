@@ -13,6 +13,7 @@ from app.api.v1.interview_prep import router as interview_prep_router
 from app.api.v1.jobs import jobs_router
 from app.api.v1.learning_roadmaps import router as learning_roadmaps_router
 from app.api.v1.matches import matches_router
+from app.api.v1.networking import router as networking_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.portfolios import router as portfolios_router
 from app.api.v1.recommendations import router as recommendations_router
@@ -59,3 +60,4 @@ api_router.include_router(
 api_router.include_router(learning_roadmaps_router)
 api_router.include_router(portfolios_router)
 api_router.include_router(career_workflow_router)
+api_router.include_router(networking_router)

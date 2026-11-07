@@ -98,6 +98,15 @@ def protected_view(current_user: User = Depends(get_current_active_user)):
 
 ---
 
+### Professional Networking & Recruiter Intelligence Guidelines
+- **Zero Fabrication & Anti-Guessing**: Recruiter profiles and contact details must originate from verified public company data, team directories, or explicit candidate additions. Never guess, infer, or synthesize recruiter email addresses.
+- **Strict Anti-Scraping Compliance**: Unpermitted scraping of LinkedIn, session hijacking, credential harvesting, and CAPTCHA bypass are strictly prohibited. Permitted sources are limited to official company careers pages, leadership/team directories, public announcements, and candidate manual entries.
+- **LinkedIn Character Limitation**: LinkedIn connection requests MUST be validated and enforced to be strictly $\le 300$ characters.
+- **Candidate Approval & Decoupled Gmail Dispatch**: All outreach drafts require explicit candidate approval before copying or sending. Gmail dispatch strictly requires `confirm_send=True` and verified recipient addresses.
+- **Single Relationship Invariant**: Candidate-recruiter CRM pairings must enforce uniqueness on `(user_id, recruiter_id)` so duplicate outreach or split relationship states cannot occur.
+
+---
+
 ## Git & Version Control Practices
 
 - Commit messages should be descriptive and conventional (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`).

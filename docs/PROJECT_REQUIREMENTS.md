@@ -119,6 +119,16 @@ Nexora is an AI-powered career discovery and application management platform des
 - Resilient background orchestration: Persistent state machine (`CareerWorkflowRun`, `CareerWorkflowStep`) executed via Celery and Redis with bounded retries ($\le 3$), idempotency, failure recovery, and cancellation controls.
 - Dedicated UI workspace at `/dashboard/career-workflow` featuring visual pipeline progress, KPI stats, prioritized recommended actions, discovery opportunities, 8-asset preparation modal, execution gates, onboarding review drawer, and workflow run history.
 
+### 22. Professional Networking & Recruiter Intelligence (Prompt 22)
+- Recruiter Intelligence: Structured profiles (`full_name`, `designation`, `company_name`, `recruitment_specialization`, `relevant_departments`, `public_profile_url`, `contact_email`, `phone`, `associated_job_ids`, `source_type`, `verification_status`). Distinguishes verified from inferred/unverified records; strictly forbids inventing recruiter identities or email addresses.
+- Recruiter Discovery: Discovery restricted to permitted public sources (official company careers pages, leadership/team directories, public announcements, and manual candidate additions). Strict prohibition against unpermitted LinkedIn scraping, session hijacking, or CAPTCHA bypass.
+- Explainable Recruiter Matching: Deterministic scoring formula ($S_{\text{recruiter}} = 0.35 \times S_{\text{role}} + 0.30 \times S_{\text{company}} + 0.20 \times S_{\text{skills}} + 0.15 \times S_{\text{dept}}$) paired with contextual AI explanations ("Why Recommended").
+- AI Networking Outreach Assistant: Supports 7 message types (`linkedin_connection`, `recruiter_intro`, `job_inquiry`, `internship_inquiry`, `follow_up`, `interview_thank_you`, `networking_email`) across 4 customizable tones. Enforces strict $\le 300$ character constraint for LinkedIn connection notes; factual grounding in candidate's verified resume with zero hallucinated mutual connections or employment history.
+- Candidate Approval Gate & Decoupled Dispatch: All generated messages require candidate review and approval before dispatch; Gmail dispatch requires explicit confirmation (`confirm_send=True`) and never sends to guessed email addresses.
+- Networking CRM & Activity Timeline: Tracks relationship states (`saved`, `outreach_prepared`, `contacted`, `awaiting_response`, `responded`, `follow_up_required`, `connected`, `archived`), channels, response states, follow-up dates, notes, and activity timeline. Enforces single relationship per recruiter-candidate pair.
+- Follow-up Intelligence: Automated Celery background task (`check_networking_followups_task`) detecting overdue outreach (>5 days) and surfacing deduplicated alerts.
+- Dedicated SaaS UI workspace at `/dashboard/networking` with Overview KPIs, Recruiter Discovery, Networking CRM, AI Outreach Studio, and Activity Timeline.
+
 ---
 
 ## Non-Functional Requirements
