@@ -1345,20 +1345,15 @@ def test_redis_pacing_multiple_simulated_workers():
     worker_1 = RobotsPolicyEnforcer()
     worker_2 = RobotsPolicyEnforcer()
 
-    base_time = 1000.0
-
-    with (
-        patch("time.sleep") as mock_sleep,
-        patch("time.time", side_effect=[base_time, base_time + 1.0]),
-    ):
-        # Worker 1 requests at t = 1000.0
+    with patch("time.sleep") as mock_sleep:
+        # Worker 1 requests at t_redis (wait 0)
         worker_1.apply_rate_limit(f"{target_domain}/page1")
         mock_sleep.assert_not_called()
 
-        # Worker 2 requests at t = 1001.0 -> must wait 4.0s (scheduled at 1005.0)
+        # Worker 2 requests immediately after -> governed by Redis server TIME, must wait 5.0s
         worker_2.apply_rate_limit(f"{target_domain}/page2")
         assert mock_sleep.called
-        assert round(mock_sleep.call_args[0][0], 1) == 4.0
+        assert round(mock_sleep.call_args[0][0], 1) == 5.0
 
 
 def test_redis_pacing_concurrent_slot_reservations():
@@ -1438,37 +1433,194 @@ def test_redis_pacing_crawl_delay_changes_after_robots_refresh():
     RobotsPolicyEnforcer._shared_cache[target_domain] = (rp1, "parsed", time.time(), "2")
 
     enforcer = RobotsPolicyEnforcer()
-    sim_time = 5000.0
 
-    def mock_time():
-        return sim_time
-
-    with (
-        patch("time.sleep") as mock_sleep,
-        patch("time.time", side_effect=mock_time),
-    ):
-        # Page 1 at t = 5000.0: scheduled at 5000.0 (no sleep)
+    with patch("time.sleep") as mock_sleep:
+        # Page 1 at t = 0: scheduled at t (no sleep)
         enforcer.apply_rate_limit(f"{target_domain}/page1")
         mock_sleep.assert_not_called()
 
-        # Page 2 arrives concurrently at t = 5000.0: scheduled at 5002.0 (waits 2.0s)
+        # Page 2 arrives concurrently: scheduled at t + 2 (waits 2.0s)
         enforcer.apply_rate_limit(f"{target_domain}/page2")
         assert round(mock_sleep.call_args[0][0], 1) == 2.0
 
         # Now simulate robots.txt refresh with new Crawl-delay: 6
         rp2 = RobotFileParser()
         rp2.parse(["User-agent: *", "Crawl-delay: 6"])
-        RobotsPolicyEnforcer._shared_cache[target_domain] = (rp2, "parsed", sim_time, "6")
+        RobotsPolicyEnforcer._shared_cache[target_domain] = (rp2, "parsed", time.time(), "6")
 
-        # Advance simulated time to t = 5004.0
-        sim_time = 5004.0
+        # Simulate expiration/cleanup of previous slot window in Redis
+        r = _get_redis_client()
+        assert r is not None
+        r.delete(f"nexora:crawl_pacing:{target_domain}")
 
-        # Page 3 arrives at t = 5004.0: scheduled at 5004.0 (no sleep)
+        # Page 3 arrives after slot reset: scheduled immediately (no sleep)
         enforcer.apply_rate_limit(f"{target_domain}/page3")
 
-        # Page 4 arrives concurrently at t = 5004.0: scheduled at 5010.0 (waits 6.0s)
+        # Page 4 arrives concurrently with new Crawl-delay: 6: scheduled at t + 6 (waits 6.0s)
         enforcer.apply_rate_limit(f"{target_domain}/page4")
         assert round(mock_sleep.call_args[0][0], 1) == 6.0
+
+
+def test_redis_pacing_worker_clock_ahead_of_redis_time():
+    """Worker clock is 1 hour in the future compared to Redis server time.
+    Redis server time must govern pacing so delays are not bypassed or distorted.
+    """
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://clock-ahead.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 3\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+    real_time_fn = time.time
+
+    with (
+        patch("time.time", side_effect=lambda: real_time_fn() + 3600.0),
+        patch("time.sleep") as mock_sleep,
+    ):
+        # First request: slot booked at redis TIME, wait is 0
+        enforcer.apply_rate_limit(f"{target_domain}/page1")
+        mock_sleep.assert_not_called()
+
+        # Second request: worker clock is still 1 hr ahead, but Redis uses server TIME
+        # Scheduled time is last_booked (t_redis + 3.0), wait is 3.0s
+        enforcer.apply_rate_limit(f"{target_domain}/page2")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 3.0
+
+
+def test_redis_pacing_worker_clock_behind_redis_time():
+    """Worker clock is 2 hours in the past compared to Redis server time.
+    Redis server time must govern pacing so delays are not distorted by worker clock lag.
+    """
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://clock-behind.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 4\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+    real_time_fn = time.time
+
+    with (
+        patch("time.time", side_effect=lambda: real_time_fn() - 7200.0),
+        patch("time.sleep") as mock_sleep,
+    ):
+        # First request: wait 0
+        enforcer.apply_rate_limit(f"{target_domain}/page1")
+        mock_sleep.assert_not_called()
+
+        # Second request: worker clock is 2 hrs behind, wait is still strictly 4.0s
+        enforcer.apply_rate_limit(f"{target_domain}/page2")
+        assert mock_sleep.called
+        assert round(mock_sleep.call_args[0][0], 1) == 4.0
+
+
+def test_redis_pacing_multiple_workers_different_clock_offsets():
+    """Multiple workers with wildly different local clocks (ahead, behind, normal)
+    all coordinate through Redis and receive sequential slots based strictly on Redis server time.
+    """
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://skewed-workers.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 2.0\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    worker_a = RobotsPolicyEnforcer()  # Clock +1800s
+    worker_b = RobotsPolicyEnforcer()  # Clock -3600s
+    worker_c = RobotsPolicyEnforcer()  # Clock +7200s
+
+    real_time_fn = time.time
+    sleep_calls = []
+
+    def mock_sleep_record(secs: float):
+        sleep_calls.append(round(secs, 1))
+
+    with patch("time.sleep", side_effect=mock_sleep_record):
+        # Worker A requests (clock +1800s)
+        with patch("time.time", side_effect=lambda: real_time_fn() + 1800.0):
+            worker_a.apply_rate_limit(f"{target_domain}/req1")
+
+        # Worker B requests immediately (clock -3600s) -> slot t_redis + 2.0
+        with patch("time.time", side_effect=lambda: real_time_fn() - 3600.0):
+            worker_b.apply_rate_limit(f"{target_domain}/req2")
+
+        # Worker C requests immediately (clock +7200s) -> slot t_redis + 4.0
+        with patch("time.time", side_effect=lambda: real_time_fn() + 7200.0):
+            worker_c.apply_rate_limit(f"{target_domain}/req3")
+
+    # Worker A had 0s sleep; Worker B waited 2.0s; Worker C waited 4.0s
+    assert sleep_calls == [2.0, 4.0]
+
+
+def test_redis_pacing_fractional_crawl_delay_precision():
+    """Ensure fractional Crawl-delay directives (e.g., 1.25s) retain microsecond precision
+    and are not truncated to integer seconds by Redis TIME calculations.
+    """
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://fractional-delay.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 1.25\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+
+    with patch("time.sleep") as mock_sleep:
+        # First call: wait 0
+        enforcer.apply_rate_limit(f"{target_domain}/item1")
+        mock_sleep.assert_not_called()
+
+        # Second call immediately after: should wait ~1.25s, not 1.0s or integer truncated
+        enforcer.apply_rate_limit(f"{target_domain}/item2")
+        assert mock_sleep.called
+        slept = mock_sleep.call_args[0][0]
+        # Should be within 0.05s of 1.25s
+        assert abs(slept - 1.25) < 0.05
+
+
+def test_redis_pacing_delayed_worker_preserves_subsequent_slots():
+    """A worker taking longer than anticipated for its request does not cause subsequent
+    concurrent reservations to collide or violate domain pacing.
+    """
+    RobotsPolicyEnforcer.reset_shared_state()
+    target_domain = "https://delayed-worker.org"
+
+    robots_txt = "User-agent: *\nCrawl-delay: 2.0\n"
+    cd = extract_crawl_delay_directive(robots_txt, "NexoraBot")
+    rp = RobotFileParser()
+    rp.parse(robots_txt.splitlines())
+    RobotsPolicyEnforcer._shared_cache[target_domain] = (rp, "parsed", time.time(), cd)
+
+    enforcer = RobotsPolicyEnforcer()
+    sleep_calls: list[float] = []
+
+    def mock_sleep_record(secs: float):
+        sleep_calls.append(round(secs, 1))
+
+    with patch("time.sleep", side_effect=mock_sleep_record):
+        # Worker 1 gets slot at t0
+        enforcer.apply_rate_limit(f"{target_domain}/req1")
+
+        # Worker 2 immediately reserves slot at t0 + 2.0s
+        enforcer.apply_rate_limit(f"{target_domain}/req2")
+
+        # Worker 3 immediately reserves slot at t0 + 4.0s
+        enforcer.apply_rate_limit(f"{target_domain}/req3")
+
+    # Worker 1 waited 0s; Worker 2 waited 2.0s; Worker 3 waited 4.0s
+    assert sleep_calls == [2.0, 4.0]
 
 
 def test_redis_pacing_redis_unavailable_or_timeout_behavior():

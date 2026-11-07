@@ -207,9 +207,13 @@ def extract_crawl_delay_directive(robots_text: str, target_ua: str = "NexoraBot"
 
 
 _REDIS_PACING_LUA_SCRIPT = """
-local current_time = tonumber(ARGV[1])
-local delay = tonumber(ARGV[2])
-local ttl = tonumber(ARGV[3])
+local time_res = redis.call('TIME')
+local redis_sec = tonumber(time_res[1])
+local redis_usec = tonumber(time_res[2])
+local current_time = redis_sec + (redis_usec / 1000000)
+
+local delay = tonumber(ARGV[1])
+local ttl = tonumber(ARGV[2])
 
 local last_booked = redis.call('GET', KEYS[1])
 local scheduled_time = current_time
@@ -221,10 +225,15 @@ if last_booked then
     end
 end
 
+local wait_seconds = math.max(0.0, scheduled_time - current_time)
 local next_allowed = scheduled_time + delay
-redis.call('SET', KEYS[1], string.format('%.4f', next_allowed), 'EX', ttl)
+redis.call('SET', KEYS[1], string.format('%.6f', next_allowed), 'EX', ttl)
 
-return string.format('%.4f', scheduled_time)
+return {
+    string.format('%.6f', wait_seconds),
+    string.format('%.6f', scheduled_time),
+    string.format('%.6f', current_time)
+}
 """
 
 
@@ -472,21 +481,24 @@ class RobotsPolicyEnforcer:
             # Shared key per normalized domain; no paths, credentials, or params
             redis_key = f"nexora:crawl_pacing:{domain_key}"
             ttl = max(int(delay * 3), 300)
-            now = time.time()
             try:
-                scheduled_str = redis_client.eval(
+                # Atomically obtain Redis TIME, calculate slot, and reserve in Redis
+                res = redis_client.eval(
                     _REDIS_PACING_LUA_SCRIPT,
                     1,
                     redis_key,
-                    f"{now:.4f}",
-                    f"{delay:.4f}",
+                    f"{delay:.6f}",
                     str(ttl),
                 )
-                scheduled_time = float(scheduled_str)
-                wait_seconds = max(0.0, scheduled_time - now)
-                # Ignore sub-millisecond conversion jitter
-                if wait_seconds < 0.002:
+                raw_wait = res[0].decode() if isinstance(res[0], bytes) else res[0]
+                raw_sched = res[1].decode() if isinstance(res[1], bytes) else res[1]
+                wait_seconds = max(0.0, float(raw_wait))
+                scheduled_time = float(raw_sched)
+
+                # Sub-millisecond conversion jitter threshold
+                if wait_seconds < 0.001:
                     wait_seconds = 0.0
+
                 with self._shared_lock:
                     self._domain_last_request_time[domain_key] = scheduled_time
                     self._domain_next_allowed_time[domain_key] = scheduled_time + delay
