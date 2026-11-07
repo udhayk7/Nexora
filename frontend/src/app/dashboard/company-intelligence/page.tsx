@@ -31,6 +31,7 @@ import {
   Sparkles,
   Target,
   Terminal,
+  Trash2,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -217,6 +218,17 @@ function CompanyIntelligenceContent() {
     navigator.clipboard.writeText(lines.join("\n"));
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2500);
+  };
+
+  const handleDeleteReport = async (reportId: string) => {
+    if (!window.confirm("Are you sure you want to delete this research report?")) return;
+    try {
+      await companyIntelligenceApi.deleteReport(reportId);
+      setCurrentReport(null);
+      setSavedReports((prev) => prev.filter((r) => r.id !== reportId));
+    } catch (err) {
+      console.error("Failed to delete report:", err);
+    }
   };
 
   const selectedCompany = companies.find((c) => c.id === selectedCompanyId);
@@ -984,13 +996,23 @@ function CompanyIntelligenceContent() {
                           </p>
                         </div>
 
-                        <button
-                          onClick={handleCopyReportMarkdown}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-background hover:bg-muted text-foreground transition self-start"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                          {copySuccess ? "Copied Markdown!" : "Copy Report"}
-                        </button>
+                        <div className="flex items-center gap-2 self-start">
+                          <button
+                            onClick={handleCopyReportMarkdown}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-background hover:bg-muted text-foreground transition"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            {copySuccess ? "Copied Markdown!" : "Copy Report"}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReport(currentReport.id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition"
+                            title="Delete this report"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </div>
                       </div>
 
                       {/* 10 Sections Accordion / Cards */}
@@ -1041,21 +1063,39 @@ function CompanyIntelligenceContent() {
                     <div className="space-y-3">
                       {sources.map((src) => (
                         <div key={src.id} className="p-3.5 border border-border/50 rounded-lg bg-secondary/15 space-y-1.5">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="font-bold text-xs text-foreground">{src.title}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary text-muted-foreground capitalize">
-                              {src.source_type.replace(/_/g, " ")}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  src.is_verified
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                }`}
+                              >
+                                {src.is_verified ? "Verified Official" : "Third-Party"}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-secondary text-muted-foreground capitalize">
+                                {src.source_type.replace(/_/g, " ")}
+                              </span>
+                            </div>
                           </div>
-                          <a
-                            href={src.source_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[11px] text-primary hover:underline flex items-center gap-1 truncate"
-                          >
-                            {src.source_url}
-                            <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                          </a>
+                          <div className="space-y-0.5">
+                            <a
+                              href={src.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-primary hover:underline flex items-center gap-1 truncate"
+                            >
+                              {src.source_url}
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            </a>
+                            {src.final_url && src.final_url !== src.source_url && (
+                              <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
+                                <span className="font-semibold text-foreground">Redirected to:</span> {src.final_url}
+                              </p>
+                            )}
+                          </div>
                           {src.content_snippet && (
                             <p className="text-[11px] text-muted-foreground line-clamp-2">
                               {src.content_snippet}

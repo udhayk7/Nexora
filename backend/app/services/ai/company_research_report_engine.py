@@ -34,10 +34,11 @@ def compute_research_cache_hash(
     source_content_hash: Optional[str],
     candidate_skills: list[str],
     job_ids: list[str],
+    jobs_fingerprint: Optional[list[str]] = None,
 ) -> str:
     """Compute deterministic SHA-256 cache key for company research generation."""
     skills_key = ",".join(sorted(candidate_skills))
-    jobs_key = ",".join(sorted(job_ids))
+    jobs_key = ",".join(sorted(jobs_fingerprint if jobs_fingerprint is not None else job_ids))
     raw = f"{company_id}:{source_content_hash or 'no_sources'}:{skills_key}:{jobs_key}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

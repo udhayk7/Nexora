@@ -185,9 +185,7 @@ def test_storage_service_safe_save_and_retrieve(tmp_path: Path) -> None:
 
 
 # 3. API Upload & Validation Tests
-def test_upload_resume_docx_success(
-    client: TestClient, auth_headers_user1: dict[str, str]
-) -> None:
+def test_upload_resume_docx_success(client: TestClient, auth_headers_user1: dict[str, str]) -> None:
     docx_bytes = generate_sample_docx()
     files = {"file": ("my_resume.docx", docx_bytes, DOCX_MIME)}
     data = {"title": "Full Stack Resume 2026"}
@@ -290,9 +288,7 @@ def test_user_isolation_list_and_details(
 
 
 # 5. Version Management Tests
-def test_upload_new_version(
-    client: TestClient, auth_headers_user1: dict[str, str]
-) -> None:
+def test_upload_new_version(client: TestClient, auth_headers_user1: dict[str, str]) -> None:
     # Upload version 1
     docx_bytes_v1 = generate_sample_docx(name="Jane V1", skills="Python, Django")
     files_v1 = {"file": ("v1.docx", docx_bytes_v1, DOCX_MIME)}
@@ -327,9 +323,7 @@ def test_upload_new_version(
 
 
 # 6. Download & Delete Tests
-def test_download_and_delete_resume(
-    client: TestClient, auth_headers_user1: dict[str, str]
-) -> None:
+def test_download_and_delete_resume(client: TestClient, auth_headers_user1: dict[str, str]) -> None:
     docx_bytes = generate_sample_docx()
     files = {"file": ("download_test.docx", docx_bytes, DOCX_MIME)}
     res = client.post("/api/v1/resumes", headers=auth_headers_user1, files=files)

@@ -162,16 +162,18 @@ def extract_technologies_with_evidence(
     official_sources_text: str,
     job_descriptions: list[str],
     company_tags: Optional[list[str]] = None,
+    unverified_sources_text: str = "",
 ) -> list[dict[str, Any]]:
     """Analyze company textual assets and job descriptions, classifying evidence strength.
 
     Classification Rules:
-    - 'confirmed': direct mention in official company website or engineering publications.
+    - 'confirmed': direct mention in verified official company web sources / publications.
     - 'supported': mentioned across 2 or more active job postings.
-    - 'inferred': mentioned in 1 job posting, or in pre-existing company tags.
+    - 'inferred': mentioned in 1 job posting, unverified third-party sources, or company tags.
     - 'unknown': not detected with verified evidence.
     """
     official_lower = official_sources_text.lower() if official_sources_text else ""
+    unverified_lower = unverified_sources_text.lower() if unverified_sources_text else ""
     job_lowers = [jd.lower() for jd in job_descriptions if jd]
     tags_lower = [t.lower() for t in (company_tags or []) if t]
 
@@ -182,20 +184,32 @@ def extract_technologies_with_evidence(
         category = item["category"]
         patterns = item["patterns"]
 
-        # Check official sources
+        # 1. Check verified official sources
         official_match = False
         official_context: Optional[str] = None
         for pat in patterns:
             m = re.search(pat, official_lower)
             if m:
                 official_match = True
-                # Extract small snippet around match
                 start = max(0, m.start() - 40)
                 end = min(len(official_lower), m.end() + 40)
                 official_context = official_lower[start:end].strip()
                 break
 
-        # Count job posting matches
+        # 2. Check unverified third-party sources
+        unverified_match = False
+        unverified_context: Optional[str] = None
+        if not official_match:
+            for pat in patterns:
+                m = re.search(pat, unverified_lower)
+                if m:
+                    unverified_match = True
+                    start = max(0, m.start() - 40)
+                    end = min(len(unverified_lower), m.end() + 40)
+                    unverified_context = unverified_lower[start:end].strip()
+                    break
+
+        # 3. Count job posting matches
         job_matches_count = 0
         job_context: Optional[str] = None
         for jd in job_lowers:
@@ -209,7 +223,7 @@ def extract_technologies_with_evidence(
                         job_context = jd[start:end].strip()
                     break
 
-        # Check tags
+        # 4. Check tags
         tag_match = any(
             (tag == name.lower() or any(re.search(pat, tag) for pat in patterns))
             for tag in tags_lower
@@ -221,7 +235,7 @@ def extract_technologies_with_evidence(
 
         if official_match:
             strength = "confirmed"
-            source = "Direct mention in official company web sources / documentation"
+            source = "Direct mention in verified official company documentation / web publications"
             context = official_context
         elif job_matches_count >= 2:
             strength = "supported"
@@ -231,6 +245,10 @@ def extract_technologies_with_evidence(
             strength = "inferred"
             source = "Derived from 1 open job requisition"
             context = job_context
+        elif unverified_match:
+            strength = "inferred"
+            source = "Derived from unverified third-party public mention / syndicated feed"
+            context = unverified_context
         elif tag_match:
             strength = "inferred"
             source = "Derived from company profile technology tags"

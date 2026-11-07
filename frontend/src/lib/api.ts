@@ -2529,6 +2529,7 @@ export interface CompanyResearchSourceResponse {
   company_id: string;
   source_type: string;
   source_url: string;
+  final_url?: string | null;
   title: string;
   content_snippet?: string | null;
   content_hash: string;
@@ -2573,11 +2574,15 @@ export interface CompanyResearchReportResponse {
   sections: Record<string, CompanyResearchReportSection>;
   candidate_fit?: CompanyFitAssessmentResponse | null;
   source_evidence: Array<{
+    source_id?: string;
     title: string;
     source_url: string;
+    final_url?: string | null;
     source_type?: string;
     content_snippet?: string;
+    content_hash?: string;
     is_verified?: boolean;
+    retrieved_at?: string | null;
   }>;
   provider: string;
   model: string;
@@ -2628,6 +2633,11 @@ export const companyIntelligenceApi = {
 
   getReportDetail: (reportId: string) =>
     apiClient<CompanyResearchReportResponse>(`/company-intelligence/reports/${reportId}`),
+
+  deleteReport: (reportId: string) =>
+    apiClient<void>(`/company-intelligence/reports/${reportId}`, {
+      method: "DELETE",
+    }),
 };
 
 

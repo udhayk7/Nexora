@@ -51,4 +51,3 @@ def test_get_db_rollback_on_exception(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mock_session.rollback.assert_called_once()
     mock_session.close.assert_called_once()
-

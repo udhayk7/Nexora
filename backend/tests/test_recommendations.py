@@ -230,9 +230,7 @@ def test_job_intelligence_caching_by_content_hash(db_session: Session) -> None:
     assert intel3.content_hash != initial_hash
 
 
-def test_ai_match_engine_deterministic_fallback(
-    client: TestClient, db_session: Session
-) -> None:
+def test_ai_match_engine_deterministic_fallback(client: TestClient, db_session: Session) -> None:
     """Verify AI match evaluation produces grounded ratings, strengths, and next steps."""
     _, user_email = create_test_user_and_auth(client, email="fallback_user@example.com")
     user = db_session.query(User).filter(User.email == user_email).first()
@@ -267,9 +265,7 @@ def test_ai_match_engine_deterministic_fallback(
     assert result["is_deterministic_fallback"] is True
 
 
-def test_ai_match_caching_by_assessment_hash(
-    client: TestClient, db_session: Session
-) -> None:
+def test_ai_match_caching_by_assessment_hash(client: TestClient, db_session: Session) -> None:
     """Verify AIJobMatch is cached by assessment_hash and avoids repeat processing."""
     _, user_email = create_test_user_and_auth(client, email="caching_user@example.com")
     user = db_session.query(User).filter(User.email == user_email).first()
@@ -596,4 +592,3 @@ def test_update_recommendation_opportunity_state(
     assert rec_resp.status_code == 200
     job_ids = [item["job_id"] for item in rec_resp.json()["items"]]
     assert str(job.id) not in job_ids
-

@@ -616,29 +616,40 @@ The Company Intelligence module provides candidates with transparent, evidence-g
 Core invariants enforced:
 1. **Zero Fabrication**: Company headcount, revenue, and funding are only reported when verifiable evidence exists in official sources. Missing or non-disclosed metrics are explicitly labeled `"Undisclosed"` or `"Not publicly evidenced"`.
 2. **Provenance & Evidence Tiers**: Every identified technology is classified into one of four evidence strengths:
-   - `confirmed`: Direct official mention in company web pages, engineering blogs, or technical publications.
-   - `supported`: Mentioned across multiple active or recent job requisitions in the Nexora database.
-   - `inferred`: Derived from secondary ecosystems, plugins, or existing company profile tags with transparent attribution.
+   - `confirmed`: Direct official mention in company web pages, engineering blogs, or technical publications from **verified official domains**.
+   - `supported`: Mentioned across 2 or more active job requisitions in the Nexora database.
+   - `inferred`: Derived from 1 open job requisition, company profile tags, or unverified/third-party syndicated sources with transparent attribution.
    - `unknown`: When evidence is ambiguous or unverified.
-3. **Safe Public Web Research**: All outbound HTTP fetches use `SSRFSafeTransport` with connection-time DNS rebinding validation, blocking access to private/internal CIDRs, loopbacks, and cloud metadata services.
+3. **Safe Public Web Research**: All outbound HTTP fetches use `SSRFSafeTransport` with connection-time DNS rebinding validation, blocking access to private/internal CIDRs, loopbacks, and cloud metadata services. Responses are stream-checked with a hard 2MB size cap and multi-hop redirect destination validation.
 4. **Hiring Truth Grounding**: Aggregated hiring trends (active jobs, entry-level, internships, top categories, locations) are calculated strictly from discovered job records in the Nexora database, distinguishing active from expired/stale postings.
-5. **Grounded Candidate Fit**: Evaluates alignment between verified resume skills, user career preferences, and company technologies without exaggerating candidate qualifications.
-6. **Deterministic Caching**: 10-section research reports compute a SHA-256 digest of `(company_id, source_content_hash, candidate_skills, job_ids)` and return cached reports unless `force_refresh` is requested.
+5. **Grounded Candidate Fit & Tenant Isolation**: Evaluates alignment between verified resume skills, user career preferences, and company technologies without exaggerating candidate qualifications. User resume version ownership is strictly verified.
+6. **Deterministic Caching & Stale Invalidation**: 10-section research reports compute a SHA-256 digest of `(company_id, source_content_hash, candidate_skills, job_ids, jobs_fingerprint)`. If intelligence is updated or job statuses change, cached reports are invalidated.
+7. **Strict Platform Compliance**: Operates in compliance with robots.txt and public terms of service. Does not perform unauthorized scraping behind authentication gates, paywalls, or anti-bot challenges (e.g. Cloudflare Turnstile/CAPTCHA).
 
 ### 21.2 Data Models & Relational Architecture
 - **`CompanyIntelligence` (`company_intelligence`)**:
   - One-to-one with `Company`. Stores `overview`, `industry_domain`, `headquarters`, `operating_locations`, `website_url`, `careers_url`, `products_and_services` (JSONB), `technology_stack` (JSONB), `size_band`, `size_evidence`, `funding_ownership_info`, `recent_developments` (JSONB), `hiring_summary` (JSONB), `source_content_hash`, `last_researched_at`, `is_stale`, `provenance_sources_count`.
 - **`CompanyResearchSource` (`company_research_sources`)**:
-  - Many-to-one with `Company`. Stores `source_type` (`official_website`, `careers_page`, `engineering_blog`, `news_release`, `public_feed`), `source_url`, `title`, `content_snippet`, `raw_content`, `content_hash` (SHA-256), `retrieved_at`, `is_verified`.
+  - Many-to-one with `Company`. Stores `source_type` (`official_website`, `careers_page`, `news_release`, `engineering_blog`, `investor_relations`, `public_feed`), `source_url`, `final_url` (tracks redirects), `title`, `content_snippet`, `raw_content`, `content_hash` (SHA-256), `retrieved_at`, `is_verified` (True only for verified company + matching official domain).
 - **`CompanyResearchReport` (`company_research_reports`)**:
-  - Scoped to `user_id` and `company_id`. Stores `report_title`, `sections` (10-section dictionary), `candidate_fit` (JSONB), `source_evidence` (JSONB array), `content_hash` (SHA-256 cache key), `provider`, `model`, `is_cached`, `is_deterministic_fallback`.
+  - Scoped to `user_id` and `company_id`. Stores `report_title`, `sections` (10-section dictionary), `candidate_fit` (JSONB), `source_evidence` (JSONB array), `content_hash` (SHA-256 cache key), `provider`, `model`, `is_cached`, `is_deterministic_fallback`. Fully deletable by owner via `DELETE /company-intelligence/reports/{id}`.
 
-### 21.3 Public Web Ingestion & Technology Classification
-- **`OfficialWebsiteAdapter` (`services/company_intelligence/adapters.py`)**: Safely fetches homepage, about page, and careers page via `SSRFSafeTransport`, extracting clean text with standard library `SimpleHTMLTextExtractor` and computing content hashes.
-- **`TechnologyExtractor` (`services/company_intelligence/technology_extractor.py`)**: Matches against canonical taxonomy across 8 categories (Languages, Frameworks, Cloud, Databases, AI/ML, DevOps, Dev Tools, Practices), classifying evidence strength based on source provenance.
-- **`FitEvaluator` (`services/company_intelligence/fit_evaluator.py`)**: Computes fit score, matching competencies, gap skills, role matches, and customized interview focus points.
+### 21.3 Public Web Ingestion & Multi-Source Coverage
+The `CompanyResearchCoordinator` coordinates public evidence discovery and collection across 6 genuine source categories:
+1. **Official Company Websites**: `OfficialWebsiteAdapter` fetches homepage, `/about`, and `/company`.
+2. **Company Newsrooms & Press Releases**: `CompanyNewsroomAdapter` discovers `/news`, `/press`, `/newsroom`, and configured news sources.
+3. **Engineering Blogs & Tech Docs**: `EngineeringBlogAdapter` discovers `/blog`, `/engineering`, `/techblog`, and configured engineering URLs.
+4. **Investor Relations & Public Disclosures**: `InvestorRelationsAdapter` discovers `/investors`, `/ir`, `/investor-relations` for corporate reports.
+5. **Permitted Public RSS/Atom Feeds**: `RSSFeedAdapter` safely parses RSS 2.0 and Atom feeds, blocking DTD/entity expansion (XXE protection).
+6. **Permitted Public JSON Feeds**: `JSONFeedAdapter` parses standard JSON Feed 1.1 streams.
 
-### 21.4 10-Section AI Research Dossier
+### 21.4 Content Security & Threat Defense
+- **Connection-Time IP Pinning (`SSRFSafeTransport`)**: Resolves hostnames and verifies socket destination IPs immediately prior to TCP handshake, defeating DNS rebinding attacks.
+- **Decompression Bomb Protection**: Streams responses chunk by chunk and halts at 2MB (`MAX_RESPONSE_BYTES`).
+- **Prompt Injection Neutralization**: `sanitize_untrusted_content` strips and filters instruction-override patterns (`ignore previous instructions`, `system prompt:`, `assistant:`, etc.) from scraped HTML and feed text before passing to LLM prompts.
+- **Multi-Hop Redirect Validation**: Validates each redirect hop URL against scheme and hostname policies.
+
+### 21.5 10-Section AI Research Dossier
 - Structured sections:
   1. `overview`: Company overview and mission
   2. `products_and_services`: Products, services, and business model
@@ -649,7 +660,7 @@ Core invariants enforced:
   7. `candidate_alignment`: Candidate-company alignment (skills, strengths, gaps)
   8. `interview_prep_topics`: Recommended interview preparation topics
   9. `recruiter_interviewer_questions`: Thoughtful questions to ask recruiters and interviewers
-  10. `sources_and_evidence`: Sources and evidence summary
+  10. `sources_and_evidence`: Sources and evidence summary with verification and provenance citations
 
 ---
 

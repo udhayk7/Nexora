@@ -57,14 +57,17 @@ Nexora is an AI-powered career discovery and application management platform des
 - Automated preparation reminder alarms integrated into existing `NotificationService` and Celery infrastructure.
 - Direct shortcut from Application Tracker interview rounds without automatically modifying application status.
 
-### 8. Company Intelligence & Employer Research (Completed — Prompt 17)
+### 8. Company Intelligence & Employer Research (Completed — Prompt 17 & 17 Audit)
 - Evidence-backed company intelligence profiles covering overview, industry domain, operating locations, products/services, size, and funding without fabrication.
-- Modular public research-source architecture fetching official websites, about pages, careers pages, and engineering blogs via `SSRFSafeTransport`.
-- Engineering technology intelligence with 4-tier evidence classifications (`confirmed`, `supported`, `inferred`, `unknown`) and citation sources.
+- 6 genuinely supported public research source categories: official websites, company newsrooms, engineering blogs, investor relations, permitted public RSS/Atom feeds, and permitted public JSON feeds.
+- Source verification semantics: sources are only verified (`is_verified=True`) when their final destination matches the company's verified official domain.
+- Technology stack evidence integrity: confirmed technologies require direct verified official source documentation; unverified sources or single job postings classify as inferred.
+- Hardened SSRF and content security: connection-time IP pinning (`SSRFSafeTransport`), multi-hop redirect destination validation, 2MB streaming cap against decompression bombs, and prompt-injection neutralization (`sanitize_untrusted_content`).
 - Grounded hiring intelligence strictly computed from active discovered DB jobs (entry-level, internships, categories, locations).
-- Candidate-to-company fit assessment evaluating overlapping skills, flagged gap areas, role alignments, and customized interview preparation advice.
-- Structured 10-section AI research reports (`company_research_reports`) with deterministic SHA-256 caching and user ownership.
-- Dedicated frontend workspace (`/dashboard/company-intelligence`) with company search, technology breakdown, hiring trends, candidate fit, and report viewer.
+- Candidate-to-company fit assessment evaluating overlapping skills, flagged gap areas, role alignments, and customized interview preparation advice with strict resume-version ownership validation.
+- Structured 10-section AI research reports (`company_research_reports`) with deterministic SHA-256 caching (incorporating job fingerprints), stale cache invalidation, and owner-isolated report deletion (`DELETE /company-intelligence/reports/{id}`).
+- Documented limitations: complies strictly with robots.txt and terms of service; no unauthorized scraping behind authentication gates, paywalls, or anti-bot challenges.
+- Dedicated frontend workspace (`/dashboard/company-intelligence`) with company search, technology breakdown, hiring trends, candidate fit, report viewer with deletion, and public source provenance viewer with redirect badges.
 - Integrated shortcuts from Company Discovery and Job Discovery cards.
 
 ---

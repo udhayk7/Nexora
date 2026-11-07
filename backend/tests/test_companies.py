@@ -535,4 +535,3 @@ def test_authorization_user_isolation_and_admin(
         headers=auth_headers_admin,
     )
     assert admin_edit_global_ok.status_code == 200
-

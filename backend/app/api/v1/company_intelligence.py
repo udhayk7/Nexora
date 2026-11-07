@@ -278,3 +278,17 @@ def get_company_report_detail(
         created_at=report.created_at,
         updated_at=report.updated_at,
     )
+
+
+@router.delete(
+    "/company-intelligence/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a company research report owned by current user",
+)
+def delete_company_report(
+    report_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> None:
+    service = CompanyIntelligenceService(db)
+    service.delete_report(user=current_user, report_id=report_id)

@@ -133,9 +133,7 @@ def test_submit_verification_evidence_multi_event(
         "verification_outcome": "corroborated",
         "reason": "Direct listing verified on primary company careers portal.",
     }
-    res1 = client.post(
-        f"/api/v1/jobs/{job_id}/verifications", json=ev1, headers=auth_headers_user1
-    )
+    res1 = client.post(f"/api/v1/jobs/{job_id}/verifications", json=ev1, headers=auth_headers_user1)
     assert res1.status_code == 201
     d1 = res1.json()
     assert d1["verification_status"] == "corroborated"
@@ -150,9 +148,7 @@ def test_submit_verification_evidence_multi_event(
         "verification_outcome": "expired",
         "reason": "Employer notice indicates candidate pool is closed.",
     }
-    res2 = client.post(
-        f"/api/v1/jobs/{job_id}/verifications", json=ev2, headers=auth_headers_user1
-    )
+    res2 = client.post(f"/api/v1/jobs/{job_id}/verifications", json=ev2, headers=auth_headers_user1)
     assert res2.status_code == 201
     d2 = res2.json()
     assert d2["verification_status"] == "expired"

@@ -49,4 +49,3 @@ def test_sanitize_data_redacts_sensitive_keys() -> None:
     assert cleaned["nested"]["normal"] == "value"
     assert cleaned["items"][0]["access_token"] == "[REDACTED]"
     assert cleaned["items"][1]["item_name"] == "resume.pdf"
-

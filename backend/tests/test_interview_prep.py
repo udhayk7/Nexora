@@ -180,9 +180,7 @@ def test_create_session_and_plan_generation(client: TestClient, db_session: Sess
     assert "potential_skill_gaps" in plan
 
 
-def test_question_generation_different_categories(
-    client: TestClient, db_session: Session
-) -> None:
+def test_question_generation_different_categories(client: TestClient, db_session: Session) -> None:
     headers, email = create_user_and_auth(client, "prep_user_2@example.com")
     setup_interview_entities(db_session, email)
 
@@ -255,9 +253,7 @@ def test_answer_submission_and_rubric_evaluation(client: TestClient, db_session:
     assert "suggested_improvements" in eval_data
 
     # Session Progress verified through session detail
-    sess_resp = client.get(
-        f"/api/v1/interview-prep/sessions/{session_id}", headers=headers
-    )
+    sess_resp = client.get(f"/api/v1/interview-prep/sessions/{session_id}", headers=headers)
     assert sess_resp.status_code == 200
     sess = sess_resp.json()
     assert sess["completed_questions"] == 1
@@ -349,9 +345,7 @@ def test_notes_crud_and_pinning(client: TestClient, db_session: Session) -> None
         "note_type": "topics_to_revise",
         "is_pinned": False,
     }
-    create_resp = client.post(
-        "/api/v1/interview-prep/notes", json=create_payload, headers=headers
-    )
+    create_resp = client.post("/api/v1/interview-prep/notes", json=create_payload, headers=headers)
     assert create_resp.status_code == 201
     note_id = create_resp.json()["id"]
 

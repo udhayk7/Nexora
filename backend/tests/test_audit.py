@@ -79,4 +79,3 @@ def test_logging_audit_sink() -> None:
     )
     # Should execute without throwing any exception
     sink.emit(event)
-

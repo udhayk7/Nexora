@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError
 from app.core.logging import logger
 from app.models.analysis import ResumeAnalysis
-from app.models.company import Company
+from app.models.company import Company, CompanySource
 from app.models.company_intelligence import (
     CompanyIntelligence,
     CompanyResearchReport,
@@ -23,13 +23,14 @@ from app.models.company_intelligence import (
 )
 from app.models.job import Job
 from app.models.match import UserMatchingPreference
+from app.models.resume import Resume, ResumeVersion
 from app.models.user import User
 from app.schemas.company_intelligence import CompanyResearchGenerateRequest
 from app.services.ai.company_research_report_engine import (
     AICompanyResearchReportEngine,
     compute_research_cache_hash,
 )
-from app.services.company_intelligence.adapters import OfficialWebsiteAdapter
+from app.services.company_intelligence.adapters import CompanyResearchCoordinator
 from app.services.company_intelligence.fit_evaluator import evaluate_company_fit
 from app.services.company_intelligence.technology_extractor import (
     extract_technologies_with_evidence,
@@ -41,7 +42,7 @@ class CompanyIntelligenceService:
 
     def __init__(self, db: Session) -> None:
         self.db = db
-        self.adapter = OfficialWebsiteAdapter()
+        self.coordinator = CompanyResearchCoordinator()
 
     def get_company_or_404(self, company_id: uuid.UUID) -> Company:
         company = self.db.execute(
@@ -170,9 +171,28 @@ class CompanyIntelligenceService:
         )
 
         if not existing_sources or refresh:
-            fetched_payloads = self.adapter.fetch_company_sources(
+            company_sources = (
+                self.db.execute(
+                    select(CompanySource).where(
+                        CompanySource.company_id == company_id,
+                        CompanySource.is_enabled == True,  # noqa: E712
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            configured_sources = [
+                {"source_type": cs.source_type, "url": cs.source_url}
+                for cs in company_sources
+                if cs.source_url
+            ]
+
+            fetched_payloads = self.coordinator.fetch_all_sources(
                 website_url=company.website_url,
                 careers_url=company.careers_url,
+                expected_domain=company.normalized_domain,
+                company_is_verified=(company.verification_status == "verified"),
+                configured_sources=configured_sources,
             )
             for p in fetched_payloads:
                 # Deduplicate by content hash
@@ -188,12 +208,14 @@ class CompanyIntelligenceService:
                         company_id=company_id,
                         source_type=p.source_type,
                         source_url=p.source_url,
+                        final_url=p.final_url,
                         title=p.title,
                         content_snippet=p.content_snippet,
                         raw_content=p.raw_content,
                         content_hash=p.content_hash,
                         retrieved_at=p.retrieved_at,
-                        is_verified=True,
+                        is_verified=p.is_verified,
+                        metadata_json=p.metadata_json,
                     )
                     self.db.add(new_src)
             self.db.commit()
@@ -209,10 +231,18 @@ class CompanyIntelligenceService:
                 .all()
             )
 
-        # Combine text for analysis
-        combined_source_text = "\n\n".join(
-            [f"{s.title}\n{s.raw_content or s.content_snippet or ''}" for s in existing_sources]
+        # Distinguish verified official sources from unverified/third-party sources
+        verified_sources = [s for s in existing_sources if s.is_verified]
+        unverified_sources = [s for s in existing_sources if not s.is_verified]
+
+        verified_text = "\n\n".join(
+            [f"{s.title}\n{s.raw_content or s.content_snippet or ''}" for s in verified_sources]
         )
+        unverified_text = "\n\n".join(
+            [f"{s.title}\n{s.raw_content or s.content_snippet or ''}" for s in unverified_sources]
+        )
+
+        combined_source_text = "\n\n".join(filter(None, [verified_text, unverified_text]))
 
         source_hash = (
             hashlib.sha256(combined_source_text.encode("utf-8")).hexdigest()
@@ -224,9 +254,10 @@ class CompanyIntelligenceService:
         hiring_summary, active_jobs = self.compute_hiring_summary(company_id)
         job_descriptions = [j.get("description", "") for j in active_jobs]
 
-        # 3. Technology intelligence extraction
+        # 3. Technology intelligence extraction (strict evidence separation)
         tech_items = extract_technologies_with_evidence(
-            official_sources_text=combined_source_text,
+            official_sources_text=verified_text,
+            unverified_sources_text=unverified_text,
             job_descriptions=job_descriptions,
             company_tags=list(company.technology_tags or []),
         )
@@ -357,6 +388,17 @@ class CompanyIntelligenceService:
         candidate_skills: list[str] = []
         query = select(ResumeAnalysis).where(ResumeAnalysis.user_id == user.id)
         if resume_version_id:
+            # Enforce strict ownership check
+            ver = self.db.execute(
+                select(ResumeVersion)
+                .join(Resume)
+                .where(
+                    ResumeVersion.id == resume_version_id,
+                    Resume.user_id == user.id,
+                )
+            ).scalar_one_or_none()
+            if not ver:
+                raise NotFoundError(f"Resume version {resume_version_id} not found for user")
             query = query.where(ResumeAnalysis.version_id == resume_version_id)
         analysis = (
             self.db.execute(query.order_by(desc(ResumeAnalysis.created_at))).scalars().first()
@@ -409,6 +451,9 @@ class CompanyIntelligenceService:
         # Active jobs
         _, active_jobs = self.compute_hiring_summary(company_id)
         job_ids = [str(j["id"]) for j in active_jobs]
+        jobs_fingerprint = [
+            f"{j['id']}:{j.get('job_status')}:{j.get('title')}" for j in active_jobs
+        ]
 
         # Sources
         sources = (
@@ -423,16 +468,20 @@ class CompanyIntelligenceService:
 
         sources_list = [
             {
+                "source_id": str(s.id),
                 "title": s.title,
                 "source_url": s.source_url,
+                "final_url": s.final_url,
                 "source_type": s.source_type,
                 "content_snippet": s.content_snippet,
+                "content_hash": s.content_hash,
                 "is_verified": s.is_verified,
+                "retrieved_at": s.retrieved_at.isoformat() if s.retrieved_at else None,
             }
             for s in sources
         ]
 
-        # Compute cache key
+        # Compute cache key (including jobs fingerprint and candidate skills)
         candidate_skills = candidate_fit.get("matching_skills", []) + candidate_fit.get(
             "missing_or_gap_skills", []
         )
@@ -441,10 +490,11 @@ class CompanyIntelligenceService:
             source_content_hash=intel.source_content_hash,
             candidate_skills=candidate_skills,
             job_ids=job_ids,
+            jobs_fingerprint=jobs_fingerprint,
         )
 
         # Check existing cached report for this user
-        if not req.force_refresh:
+        if not req.force_refresh and not intel.is_stale:
             cached_report = (
                 self.db.execute(
                     select(CompanyResearchReport).where(
@@ -458,9 +508,16 @@ class CompanyIntelligenceService:
             )
 
             if cached_report:
-                logger.info("Returning cached company research report %s", cached_report.id)
-                cached_report.is_cached = True
-                return cached_report
+                # If intelligence was updated after this cached report was created, treat as stale
+                if intel.last_researched_at and cached_report.created_at < intel.last_researched_at:
+                    logger.info(
+                        "Cached report %s is older than last_researched_at, regenerating",
+                        cached_report.id,
+                    )
+                else:
+                    logger.info("Returning cached company research report %s", cached_report.id)
+                    cached_report.is_cached = True
+                    return cached_report
 
         # Generate report
         sections, provider, model, is_fallback = AICompanyResearchReportEngine.generate_report(
@@ -530,6 +587,17 @@ class CompanyIntelligenceService:
         if not report:
             raise NotFoundError(f"Research report {report_id} not found")
         return report
+
+    def delete_report(
+        self,
+        user: User,
+        report_id: uuid.UUID,
+    ) -> bool:
+        """Delete specific report owned by the user."""
+        report = self.get_report_or_404(user, report_id)
+        self.db.delete(report)
+        self.db.commit()
+        return True
 
     def list_sources(self, company_id: uuid.UUID) -> list[CompanyResearchSource]:
         """List public research documents/sources for a company."""

@@ -143,6 +143,10 @@ class CompanyResearchSource(Base, TimestampMixin):
         String(500),
         nullable=False,
     )
+    final_url: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True,
+    )
     title: Mapped[str] = mapped_column(
         String(255),
         nullable=False,

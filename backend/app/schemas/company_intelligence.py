@@ -109,6 +109,7 @@ class CompanyResearchSourceResponse(BaseModel):
     company_id: uuid.UUID
     source_type: str
     source_url: str
+    final_url: Optional[str] = None
     title: str
     content_snippet: Optional[str] = None
     content_hash: str

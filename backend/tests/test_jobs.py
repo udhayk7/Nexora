@@ -104,13 +104,9 @@ def test_normalize_job_title_clustering() -> None:
         == "senior software engineer backend python"
     )
     assert (
-        normalize_job_title("Software Development Engineer II")
-        == "software development engineer 2"
+        normalize_job_title("Software Development Engineer II") == "software development engineer 2"
     )
-    assert (
-        normalize_job_title("Frontend Engineer III")
-        == "frontend engineer 3"
-    )
+    assert normalize_job_title("Frontend Engineer III") == "frontend engineer 3"
 
 
 # 2. Job Creation & Audit Tests

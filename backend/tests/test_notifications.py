@@ -308,9 +308,7 @@ def test_duplicate_prevention_idempotency(client: TestClient, db_session: Sessio
     assert list_res.json()["total"] == 1
 
 
-def test_cancelled_and_completed_event_exclusions(
-    client: TestClient, db_session: Session
-) -> None:
+def test_cancelled_and_completed_event_exclusions(client: TestClient, db_session: Session) -> None:
     headers, email = create_user_and_token(client, "exclusions_test@example.com")
     user = db_session.query(User).filter(User.email == email).first()
     assert user is not None
@@ -663,9 +661,7 @@ def test_events_started_or_completed_do_not_receive_reminders(
     assert len(notifs) == 0
 
 
-def test_concurrent_execution_idempotency(
-    client: TestClient, db_session: Session
-) -> None:
+def test_concurrent_execution_idempotency(client: TestClient, db_session: Session) -> None:
     """Idempotency keys and DB constraints gracefully prevent duplicate inserts."""
     _, email = create_user_and_token(client, "concurrent_test@example.com")
     user = db_session.query(User).filter(User.email == email).first()
@@ -698,9 +694,5 @@ def test_concurrent_execution_idempotency(
     assert notif2.id == notif1.id
 
     # Database count must be exactly 1
-    count = (
-        db_session.query(Notification)
-        .filter(Notification.idempotency_key == test_key)
-        .count()
-    )
+    count = db_session.query(Notification).filter(Notification.idempotency_key == test_key).count()
     assert count == 1

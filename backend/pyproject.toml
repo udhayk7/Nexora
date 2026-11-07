@@ -61,4 +61,7 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+markers = [
+    "no_mock_web: skip automatic mocking of web adapters in company intelligence tests",
+]
 
