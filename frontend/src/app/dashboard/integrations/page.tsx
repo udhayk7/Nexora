@@ -51,21 +51,44 @@ export default function IntegrationsDashboardPage() {
   const [testResults, setTestResults] = useState<Record<string, IntegrationServiceHealth>>({});
   const [error, setError] = useState<string | null>(null);
 
+  const extractErrorMessage = (err: unknown): string => {
+    if (typeof err === "string") return err;
+    if (err && typeof err === "object") {
+      if ("message" in err && typeof (err as { message: unknown }).message === "string") {
+        return (err as { message: string }).message;
+      }
+      if ("error" in err && typeof (err as { error: unknown }).error === "string") {
+        return (err as { error: string }).error;
+      }
+    }
+    return "Failed to load integration status";
+  };
+
   const loadData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setIsRefreshing(true);
     setError(null);
     try {
-      const [health, usage, sources] = await Promise.all([
+      const [healthRes, usageRes, sourcesRes] = await Promise.allSettled([
         integrationsApi.getHealth(),
         integrationsApi.getAIUsage(),
         integrationsApi.getJobSources(),
       ]);
-      setHealthData(health);
-      setUsageData(usage);
-      setJobSourcesData(sources);
+
+      if (healthRes.status === "fulfilled") {
+        setHealthData(healthRes.value);
+      } else {
+        setError(extractErrorMessage(healthRes.reason));
+      }
+
+      if (usageRes.status === "fulfilled") {
+        setUsageData(usageRes.value);
+      }
+
+      if (sourcesRes.status === "fulfilled") {
+        setJobSourcesData(sourcesRes.value);
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to load integration status";
-      setError(message);
+      setError(extractErrorMessage(err));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -86,12 +109,12 @@ export default function IntegrationsDashboardPage() {
       // Reload health data in background to reflect current state
       integrationsApi.getHealth().then((h) => setHealthData(h)).catch(() => {});
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Service ping failed";
+      const msg = extractErrorMessage(err);
       setTestResults((prev) => ({
         ...prev,
         [serviceName]: {
           service: serviceName,
-          status: "error",
+          status: "disconnected",
           message: msg,
         },
       }));
@@ -102,7 +125,14 @@ export default function IntegrationsDashboardPage() {
 
   const getStatusBadge = (status: string | undefined) => {
     const s = (status || "unconfigured").toLowerCase();
-    if (s === "connected" || s === "operational") {
+    if (s === "connected") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <CheckCircle2 className="w-3 h-3" /> Connected
+        </span>
+      );
+    }
+    if (s === "operational") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
           <CheckCircle2 className="w-3 h-3" /> Operational
@@ -116,10 +146,17 @@ export default function IntegrationsDashboardPage() {
         </span>
       );
     }
-    if (s === "disconnected" || s === "unconfigured") {
+    if (s === "unconfigured") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary text-muted-foreground border border-border">
           <Clock className="w-3 h-3" /> Unconfigured
+        </span>
+      );
+    }
+    if (s === "disconnected" || s === "failed") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+          <XCircle className="w-3 h-3" /> Disconnected
         </span>
       );
     }
@@ -387,13 +424,13 @@ export default function IntegrationsDashboardPage() {
                 <div className="flex items-center justify-between p-2 rounded-md bg-secondary/40">
                   <span className="text-muted-foreground">Pool Size / Max:</span>
                   <span className="font-mono font-medium">
-                    {healthData?.postgres?.pool_size ?? 20} / {healthData?.postgres?.max_overflow ?? 10}
+                    {healthData?.postgres?.pool_size ?? healthData?.postgres?.pool_metrics?.size ?? 20} / {healthData?.postgres?.max_overflow ?? 10}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-secondary/40">
                   <span className="text-muted-foreground">Checked Out:</span>
                   <span className="font-mono font-medium">
-                    {healthData?.postgres?.active_connections ?? 0} active
+                    {healthData?.postgres?.active_connections ?? healthData?.postgres?.pool_metrics?.checkedout ?? 0} active
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-secondary/40">
@@ -451,7 +488,7 @@ export default function IntegrationsDashboardPage() {
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-secondary/40">
                   <span className="text-muted-foreground">Workers Online:</span>
-                  <span className="font-mono font-medium">{healthData?.celery?.connected_workers ?? 1} worker</span>
+                  <span className="font-mono font-medium">{healthData?.celery?.connected_workers ?? healthData?.celery?.active_workers_count ?? 1} worker</span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-md bg-secondary/40">
                   <span className="text-muted-foreground">Redis Latency:</span>

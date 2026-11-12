@@ -50,17 +50,17 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - SECRET_KEY=${SECRET_KEY:-change_this_to_a_secure_random_string_in_production}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_PRIMARY_PROVIDER=${AI_PRIMARY_PROVIDER:-openai}
+      - AI_SECONDARY_PROVIDER=${AI_SECONDARY_PROVIDER:-gemini}
+      - AI_FALLBACK_TO_DETERMINISTIC=${AI_FALLBACK_TO_DETERMINISTIC:-True}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_STRONG_MODEL=${OPENAI_STRONG_MODEL:-gpt-4o}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GEMINI_STRONG_MODEL=${GEMINI_STRONG_MODEL:-gemini-1.5-pro}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,11 +88,16 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/1
       - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - SECRET_KEY=${SECRET_KEY:-change_this_to_a_secure_random_string_in_production}
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_PRIMARY_PROVIDER=${AI_PRIMARY_PROVIDER:-openai}
+      - AI_SECONDARY_PROVIDER=${AI_SECONDARY_PROVIDER:-gemini}
+      - AI_FALLBACK_TO_DETERMINISTIC=${AI_FALLBACK_TO_DETERMINISTIC:-True}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_STRONG_MODEL=${OPENAI_STRONG_MODEL:-gpt-4o}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GEMINI_STRONG_MODEL=${GEMINI_STRONG_MODEL:-gemini-1.5-pro}
     depends_on:
       postgres:
         condition: service_healthy

@@ -427,6 +427,30 @@ export interface FeedIngestResult {
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export function buildApiUrl(endpoint: string): string {
+  if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+    return endpoint;
+  }
+  const base = (API_BASE || "http://localhost:8000").replace(/\/+$/, "");
+  const baseHasApiV1 = base.endsWith("/api/v1");
+
+  let path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  if (baseHasApiV1) {
+    if (path.startsWith("/api/v1/")) {
+      path = path.slice(7);
+    } else if (path === "/api/v1") {
+      path = "";
+    }
+  } else {
+    if (!path.startsWith("/api/v1") && path !== "/health") {
+      path = `/api/v1${path}`;
+    }
+  }
+
+  return `${base}${path}`;
+}
+
 let memoryAccessToken: string | null = null;
 
 export function getAccessToken(): string | null {
@@ -441,7 +465,7 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const url = buildApiUrl(endpoint);
 
   const headers = new Headers(options.headers || {});
   // Only set application/json if body is not FormData
@@ -489,7 +513,7 @@ export async function downloadFile(
   endpoint: string,
   defaultFilename = "resume-document"
 ): Promise<void> {
-  const url = `${API_BASE}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const url = buildApiUrl(endpoint);
   const headers = new Headers();
   if (memoryAccessToken) {
     headers.set("Authorization", `Bearer ${memoryAccessToken}`);
@@ -4233,7 +4257,9 @@ export interface IntegrationServiceHealth {
   pool_size?: number;
   max_overflow?: number;
   active_connections?: number;
+  pool_metrics?: { size?: number; checkedin?: number; checkedout?: number; overflow?: number };
   connected_workers?: number;
+  active_workers_count?: number;
   worker_names?: string[];
   broker_transport?: string;
   email?: string | null;
@@ -4315,12 +4341,12 @@ export interface JobSourcesResponse {
 }
 
 export const integrationsApi = {
-  getHealth: () => apiClient<IntegrationsHealthOverview>("/integrations/health"),
+  getHealth: () => apiClient<IntegrationsHealthOverview>("/api/v1/integrations/health"),
   testService: (service: string) =>
-    apiClient<IntegrationServiceHealth>(`/integrations/test/${service}`, {
+    apiClient<IntegrationServiceHealth>(`/api/v1/integrations/test/${service}`, {
       method: "POST",
     }),
-  getAIUsage: () => apiClient<AIUsageSummaryData>("/integrations/ai-usage"),
-  getJobSources: () => apiClient<JobSourcesResponse>("/integrations/job-sources"),
+  getAIUsage: () => apiClient<AIUsageSummaryData>("/api/v1/integrations/ai-usage"),
+  getJobSources: () => apiClient<JobSourcesResponse>("/api/v1/integrations/job-sources"),
 };
 

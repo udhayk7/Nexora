@@ -1,15 +1,26 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, BarChart3, Bell, Bot, Briefcase, Building2, CheckSquare, Compass, FileText, Globe, GraduationCap, Layers, Layout, LogOut, SendHorizontal, ShieldCheck, Sparkles, User, Users, Zap } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { NotificationBell } from "@/components/NotificationBell";
+import { careerWorkflowApi, WorkflowDashboardData } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
+
+  const [workflowData, setWorkflowData] = useState<WorkflowDashboardData | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(true);
+
+  useEffect(() => {
+    careerWorkflowApi.getDashboard()
+      .then(data => setWorkflowData(data))
+      .catch(() => {}) // silence error — hero degrades gracefully
+      .finally(() => setWorkflowLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -99,10 +110,84 @@ export default function DashboardPage() {
         </dl>
       </section>
 
+      {/* Dashboard Hero — Career Platform CTA */}
+      <section className="mt-8">
+        {workflowLoading ? (
+          <div className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 shadow-2xl p-8 animate-pulse">
+            <div className="h-4 bg-white/20 rounded w-40 mb-4" />
+            <div className="h-8 bg-white/30 rounded w-72 mb-6" />
+            <div className="h-3 bg-white/20 rounded w-full max-w-md mb-2" />
+            <div className="h-3 bg-white/20 rounded w-3/4 max-w-sm" />
+          </div>
+        ) : workflowData && workflowData.profile_completion_pct > 0 ? (
+          /* CONTINUE state — returning user */
+          <div className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 shadow-2xl p-8">
+            <p className="text-white/80 text-sm font-medium mb-1">🚀&nbsp; Your Job Search is Active</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-5">
+              CONTINUE YOUR JOB SEARCH
+            </h2>
+            {/* Stat chips */}
+            <div className="flex flex-wrap gap-2 mb-6">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">
+                {workflowData.profile_completion_pct}% Profile Complete
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">
+                {workflowData.new_opportunities_count} New Opportunities
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">
+                {workflowData.applications_awaiting_approval_count} Awaiting Approval
+              </span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">
+                {workflowData.incomplete_preparations_count + workflowData.applications_submitted_count} Applications
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <Link
+                href="/dashboard/workspace"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold text-sm hover:bg-indigo-50 transition-colors shadow"
+              >
+                Open Workspace <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/dashboard/career-workflow"
+                className="text-sm font-medium text-white/70 hover:text-white transition-colors"
+              >
+                View Career Workflow →
+              </Link>
+            </div>
+          </div>
+        ) : (
+          /* START state — new user */
+          <div className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 shadow-2xl p-8">
+            <p className="text-white/80 text-sm font-medium mb-1">✨&nbsp; Nexora Career Platform</p>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
+              START MY JOB SEARCH
+            </h2>
+            <p className="text-white/80 text-sm max-w-xl mb-6">
+              Set up your career profile once. Let Nexora discover opportunities,
+              prepare applications and manage your job search — all powered by AI.
+            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+              <Link
+                href="/dashboard/onboarding"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-indigo-700 font-semibold text-sm hover:bg-indigo-50 transition-colors shadow"
+              >
+                Get Started <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">🤖 AI-Powered Matching</span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">📧 Auto Applications</span>
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white">📊 Pipeline Tracking</span>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Quick Launch Cards */}
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-          Core Workspaces
+          Advanced Tools &amp; Modules
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

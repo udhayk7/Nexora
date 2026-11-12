@@ -114,10 +114,12 @@ class IntegrationHealthService:
             from app.core.database import engine
 
             pool = getattr(engine, "pool", None)
+            size = getattr(pool, "size", lambda: settings.DB_POOL_SIZE)()
+            checkedout = getattr(pool, "checkedout", lambda: 0)()
             pool_metrics = {
-                "size": getattr(pool, "size", lambda: settings.DB_POOL_SIZE)(),
+                "size": size,
                 "checkedin": getattr(pool, "checkedin", lambda: 0)(),
-                "checkedout": getattr(pool, "checkedout", lambda: 0)(),
+                "checkedout": checkedout,
                 "overflow": getattr(pool, "overflow", lambda: 0)(),
             }
 
@@ -126,6 +128,9 @@ class IntegrationHealthService:
                 "service": "postgresql",
                 "latency_ms": latency,
                 "pool_metrics": pool_metrics,
+                "pool_size": size,
+                "max_overflow": settings.DB_MAX_OVERFLOW,
+                "active_connections": checkedout,
                 "ssl_mode": settings.DB_SSL_MODE or "default",
                 "message": "PostgreSQL database connected and responsive",
             }
@@ -189,6 +194,8 @@ class IntegrationHealthService:
                 "service": "celery",
                 "broker": "redis",
                 "active_workers_count": len(active_workers),
+                "connected_workers": len(active_workers),
+                "worker_names": active_workers,
                 "registered_schedules_count": len(celery.conf.beat_schedule or {}),
                 "message": message,
             }
@@ -235,6 +242,7 @@ class IntegrationHealthService:
                 "service": "gmail_oauth",
                 "is_client_configured": True,
                 "is_connected": True,
+                "email": user_connection.email,
                 "connected_email": user_connection.email,
                 "scopes": user_connection.scopes,
                 "connected_at": user_connection.connected_at.isoformat()
@@ -312,7 +320,9 @@ class IntegrationHealthService:
 
         return {
             "status": "operational",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "adapters_count": len(adapters_info),
             "operational_count": len(adapters_info),
             "adapters": adapters_info,
+            "compliance_notes": "All discovery adapters query official APIs or open standard RSS/Atom/JSON feeds complying with robots.txt, domain crawl-delay, and strict SSRF safeguards.",
         }
